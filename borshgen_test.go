@@ -59,17 +59,7 @@ type OptionsStruct struct {
                         
 
  func TestGenerator(t *testing.T) {
-	// 	source := `
-	// package codegen
 
-	// //go:generate bingen -tag=msg -fallback=json -zero-copy
-
-	// type EventPath struct {
-	// 	ID        ID ` + "`msg:\"id,int64\" json:\"id\" enc:\"func\"`" + `
-	// 	Timestamp uint64 ` + "`msg:\"ts\" json:\"timestamp\" enc:\"int\"`" + `
-	// } 
-	//`
-                 
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("could not get caller info")

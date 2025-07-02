@@ -1021,7 +1021,7 @@ func (cg *CodeGenerator) sortEncFields(fields []FieldInfo) {
 }
 
 // Generate is the main entry point for code generation
-func GenerateDir(path, primaryTag, fallbackTag, ignoreTag string, encodeTag string, usePooling bool, maxStringLen int) error {
+func GenerateDir(path, primaryTag, fallbackTag,  encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("failed to stat path: %w", err)
@@ -1057,7 +1057,7 @@ func GenerateDir(path, primaryTag, fallbackTag, ignoreTag string, encodeTag stri
 				return nil
 			}
 		
-			fmt.Printf("Writing helper file: %s ----- %s \n", p, filepath.Base(p))
+			
 				finalFile  := strings.TrimSuffix(p, ".go")  + "_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(p)))%1000000) + "_gen.go"
 				return trimFile(tmp, finalFile)
 			}
