@@ -78,7 +78,7 @@ func main() {
 	if !strings.HasSuffix(inputFile, ".go") {
 			err = generator.GenerateDir(inputFile,  primaryTag, fallbackTag, encodeTag, ignoreTag,  usePooling, maxString)
 	} else {
-			err = generator.Generate(inputFile,  "", primaryTag, fallbackTag, encodeTag, ignoreTag,  usePooling, maxString)
+			err = generator.Generate(inputFile,  "", primaryTag, fallbackTag, encodeTag, ignoreTag,  usePooling, generator.DefaultOptions().MaxStringLen)
 	}
 
 	

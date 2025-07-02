@@ -49,7 +49,7 @@ func DefaultOptions() GeneratorOptions {
 		UsePooling:   true,
 		ZeroCopy:     false, // Default to safe copying
 		SafeMode:     true,  // Use safe zero-copy by default
-		MaxStringLen: 65535,
+		MaxStringLen: 65535 * 200,
 		MaxSliceLen:  65535,
 		EncodeTag: "enc",
 	}
