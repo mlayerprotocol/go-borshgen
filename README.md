@@ -11,7 +11,7 @@ safety, speed, and comes with a strict specification.
 
 ## Features
 
-- Go generator for with configuration tags and custom encoders for complex types
+- Go generator for supported types and custom encoders for complex types
 
 
 
@@ -20,13 +20,13 @@ safety, speed, and comes with a strict specification.
 See sample usage in in **tests/testhelper.go**
 
 - Add ``` //go:generate borshgen -tag=msg -fallback=json ``` comment over all structs that require code generation
-- Add relevant tags
-- Attach custom Parsers for unsupported types (see table of below)
+- Add the relevant tags
+- Attach custom Parsers for unsupported types (see table of supported tags below)
 - Run generator ``` borshgen -<input file or directory> ```
 - 
 
 ### Examples/How to Test
-1. Run the Generator tests in **borshgen_test.go** file within the root directory. This will
+1. Run the generator tests in **borshgen_test.go** file within the root directory. This will
 generate the helper methods within **tests** directory.
 2. Run all the tests within **tests/e2e_test.go**
 
