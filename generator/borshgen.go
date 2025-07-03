@@ -509,11 +509,10 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				"json.RawMessage":             true,
 				"github.com/google/uuid.UUID": true,
 			}
-fmt.Printf("\nPROCESSING:::%s====%+v", fieldInfo.Name, resolvedTypeInfo)
 
-			if resolvedTypeInfo != nil &&  len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
+			if resolvedTypeInfo != nil && len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
 				pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
-				
+
 				ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
 				cg.mu.Lock()
 
@@ -529,7 +528,7 @@ fmt.Printf("\nPROCESSING:::%s====%+v", fieldInfo.Name, resolvedTypeInfo)
 				}
 				cg.mu.Unlock()
 				if !fieldInfo.IsBasicType {
-					
+
 					fieldInfo.ResolvedType = resolvedTypeInfo
 					if len(resolvedTypeInfo.FullTypeName) > 0 {
 						fieldInfo.FullTypeName = resolvedTypeInfo.FullTypeName
@@ -543,18 +542,17 @@ fmt.Printf("\nPROCESSING:::%s====%+v", fieldInfo.Name, resolvedTypeInfo)
 								fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
 							}
 						} else {
-							fieldInfo.IsBasicType = isBasicType(fieldInfo.ActualType) 
+							fieldInfo.IsBasicType = isBasicType(fieldInfo.ActualType)
 							fieldInfo.ElementType = fieldInfo.ActualType
 						}
 						if isBasicType(fieldInfo.CustomTypeName) {
 							fieldInfo.CustomTypeName = ""
 						}
 
-
 					}
 
 				} else {
-						fmt.Printf("\nPackageName:::%s==== %s ==== %s", fieldInfo.Name, resolvedTypeInfo.FullTypeName, fieldInfo.ElementType)
+					fmt.Printf("\nPackageName:::%s==== %s ==== %s", fieldInfo.Name, resolvedTypeInfo.FullTypeName, fieldInfo.ElementType)
 				}
 			}
 
@@ -957,7 +955,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 			fieldInfo.ActualType = fieldInfo.Type
 			fieldInfo.IsCustomType = true
 			actualType = fieldInfo.Type
-			
+
 			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
 				fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 			}
@@ -1171,6 +1169,38 @@ func GenerateDir(path, primaryTag, fallbackTag, encodeTag string, ignoreTag stri
 	})
 }
 
+// Generate is the main entry point for code generation
+func GenerateFile(path, primaryTag, fallbackTag, encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat path: %w", err)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("path cannot be a directory: %s", path)
+	}
+	hash := make([]byte, 4)
+	if _, err := rand.Read(hash); err != nil {
+		return fmt.Errorf("failed to generate random hash: %v", err)
+	}
+	fmt.Printf("ProcessingFile: %v", path)
+	fmt.Println()
+	tmp := strings.TrimSuffix(path, ".go") + "_" + hex.EncodeToString(hash) + "_tmp_gen.go"
+	defer os.Remove(tmp)
+	err = Generate(path, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
+	if err != nil {
+		fmt.Printf("CodeGentError: %v", err)
+		if !strings.Contains(err.Error(), "no structs found") {
+			return err
+		}
+		return nil
+	}
+
+	finalFile := strings.TrimSuffix(path, ".go") + "_borshgen_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(p)))%10000000000) + "_gen.go"
+	return trimFile(tmp, finalFile)
+
+}
+
 func trimFile(inputFile, outputFile string) error {
 
 	// Step 1: Read entire file into memory
@@ -1296,6 +1326,7 @@ func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, 
 		fmt.Printf("  %s: %d primary tags, %d fallback tags, %d ignored\n",
 			s.Name, primaryCount, fallbackCount, ignoredCount)
 	}
+
 	return nil
 }
 
