@@ -1196,7 +1196,7 @@ func GenerateFile(path, primaryTag, fallbackTag, encodeTag string, ignoreTag str
 		return nil
 	}
 
-	finalFile := strings.TrimSuffix(path, ".go") + "_borshgen_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(p)))%10000000000) + "_gen.go"
+	finalFile := strings.TrimSuffix(path, ".go") + "_borshgen_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(path)))%10000000000) + "_gen.go"
 	return trimFile(tmp, finalFile)
 
 }
