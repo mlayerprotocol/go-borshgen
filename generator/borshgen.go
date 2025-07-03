@@ -509,10 +509,11 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				"json.RawMessage":             true,
 				"github.com/google/uuid.UUID": true,
 			}
+fmt.Printf("\nPROCESSING:::%s====%+v", fieldInfo.Name, resolvedTypeInfo)
 
 			if resolvedTypeInfo != nil &&  len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
 				pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
-				fmt.Printf("\nPackageName::: %s", resolvedTypeInfo.FullTypeName)
+				
 				ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
 				cg.mu.Lock()
 
@@ -528,6 +529,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 				cg.mu.Unlock()
 				if !fieldInfo.IsBasicType {
+					
 					fieldInfo.ResolvedType = resolvedTypeInfo
 					if len(resolvedTypeInfo.FullTypeName) > 0 {
 						fieldInfo.FullTypeName = resolvedTypeInfo.FullTypeName
@@ -540,13 +542,19 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 							if len(resolvedTypeInfo.ElementType.TypeName) > 0 {
 								fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
 							}
+						} else {
+							fieldInfo.IsBasicType = isBasicType(fieldInfo.ActualType) 
+							fieldInfo.ElementType = fieldInfo.ActualType
 						}
 						if isBasicType(fieldInfo.CustomTypeName) {
 							fieldInfo.CustomTypeName = ""
 						}
 
+
 					}
 
+				} else {
+						fmt.Printf("\nPackageName:::%s==== %s ==== %s", fieldInfo.Name, resolvedTypeInfo.FullTypeName, fieldInfo.ElementType)
 				}
 			}
 
@@ -668,7 +676,7 @@ func (fi *FieldInfo) GetMarshalCode(varName string) (string, bool) {
 // Helper method to get the marshal code for known types
 func (fieldInfo *FieldInfo) assignCustomEncoder(_fieldType string, prefix string) error {
 
-	fmt.Println("ASSIGNCUSTOMENCODER", prefix, _fieldType, fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName)
+	//fmt.Println("ASSIGNCUSTOMENCODER", prefix, _fieldType, fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName)
 	switch _fieldType {
 	case "time.Time":
 		fieldInfo.Type = "uint64"
@@ -949,7 +957,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 			fieldInfo.ActualType = fieldInfo.Type
 			fieldInfo.IsCustomType = true
 			actualType = fieldInfo.Type
-			fmt.Printf("\nCustomEncoderFor: %s - %+v", fieldInfo.Type, fieldInfo)
+			
 			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
 				fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 			}

@@ -231,6 +231,7 @@ func TestBinaryEncoding(t *testing.T) {
 		}
 	})
 
+	
 	t.Run("RoundTrip", func(t *testing.T) {
 		// Full round trip test
 		data, err := original.MarshalBinary()
@@ -256,6 +257,7 @@ func TestBinaryEncoding(t *testing.T) {
 		}
 	})
 }
+
 
 func TestBinaryEncodingEdgeCases(t *testing.T) {
 	t.Run("EmptyStruct", func(t *testing.T) {

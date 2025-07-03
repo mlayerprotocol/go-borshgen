@@ -799,7 +799,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 				// IsBasicType {{ .IsBasicType }}
 				// ElementType {{ .ElementType }}
 
-				cc := {{.Type}}(s.{{.Name}})
+				cc := {{.Type}}({{.PointerDeref}}s.{{.Name}})
 				_ = cc
 				{{if eq .ElementType "string"}}
 				if len(cc) > MaxStringLen {
