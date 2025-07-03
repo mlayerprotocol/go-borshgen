@@ -4,13 +4,7 @@ import (
 	"fmt"
 	"strings"
 )
-type CustomEncoder interface {
-	MarshalBinary(field any) []byte
-	UnmarshalBinary(data []byte, field any) []byte
-	BinarySize(field any) []byte
-	Encode(field any) []byte
-	
-}
+
 
 func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	name := f.Name

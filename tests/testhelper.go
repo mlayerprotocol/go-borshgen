@@ -1,5 +1,7 @@
 package tests
 
+import "encoding/json"
+
 type ID int64
 type System string
 
@@ -41,6 +43,11 @@ type Event struct {
 	OptionalCounter *int32   `msg:"opt_counter" enc:""`
 	OptionalFlag    *bool    `msg:"opt_flag" enc:""`
 	OptionalScore   *float64 `msg:"opt_score" enc:""`
+	JsonData   json.RawMessage `msg:"jsd" enc:""`
+	JsonPtrData   *json.RawMessage `msg:"jsp" enc:""`
+	JsonSliceData   []json.RawMessage `msg:"jss" enc:""`
+	JsonPointerSliceData   *[]json.RawMessage `msg:"jps" enc:""`
+	
 	
 	// Ignored field
 	Ignored string `msg:"-"`

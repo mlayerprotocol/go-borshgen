@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"go/ast"
@@ -27,6 +28,9 @@ import (
 	"github.com/mlayerprotocol/go-borshgen/templates"
 )
 
+//go:embed custom_encoders.go
+var customEncodersBytes []byte
+
 // Enhanced options with zero-copy support
 type GeneratorOptions struct {
 	PrimaryTag   string
@@ -38,7 +42,7 @@ type GeneratorOptions struct {
 	SafeMode     bool   // NEW: Safe vs unsafe zero-copy
 	MaxStringLen int
 	MaxSliceLen  int
-	EncodeTag string
+	EncodeTag    string
 }
 
 func DefaultOptions() GeneratorOptions {
@@ -51,63 +55,63 @@ func DefaultOptions() GeneratorOptions {
 		SafeMode:     true,  // Use safe zero-copy by default
 		MaxStringLen: 65535 * 200,
 		MaxSliceLen:  65535,
-		EncodeTag: "enc",
+		EncodeTag:    "enc",
 	}
 }
 
 // FieldInfo with zero-copy information
 type FieldInfo struct {
-	Name         string
-	Type         string
-	Tag          string
-	IsPointer    bool
-	IsPointerElement bool
-	PointerDeref string
-	PointerRef string
-	CustomEncoder string
-	IsCustomEncoder bool
-	ElementPointerRef string
-	ElementPointerDeref string
-	IsSlice      bool
-	IsPointerSlice      bool
-	IsMap        bool
-	IsInterface  bool
-	IsStruct     bool
-	ElementType  string
-	IsOptional   bool
-	BinaryTag    string
-	IsBasicType  bool
-	IsBasicPointerType  bool
-	IsCustomType bool
-	CustomTypeName string
-	CustomElementTypeName  string
-	ShouldIgnore bool
-	CanZeroCopy  bool // NEW: Whether this field supports zero-copy
-	HasEncTag    bool // NEW: Whether field has "enc" or "encode" tag for deterministic encoding
-	EncOrder     int  // NEW: Sort order for deterministic encoding
-	SliceItem 	int // index of item if Type is Slice
-	ActualType string
-	ResolvedType *ResolvedTypeInfo `json:"resolved_type,omitempty"`
+	Name                  string
+	Type                  string
+	Tag                   string
+	IsPointer             bool
+	IsPointerElement      bool
+	PointerDeref          string
+	PointerRef            string
+	CustomEncoder         string
+	IsCustomEncoder       bool
+	ElementPointerRef     string
+	ElementPointerDeref   string
+	IsSlice               bool
+	IsPointerSlice        bool
+	IsMap                 bool
+	IsInterface           bool
+	IsStruct              bool
+	ElementType           string
+	IsOptional            bool
+	BinaryTag             string
+	IsBasicType           bool
+	IsBasicPointerType    bool
+	IsCustomType          bool
+	CustomTypeName        string
+	CustomElementTypeName string
+	ShouldIgnore          bool
+	CanZeroCopy           bool // NEW: Whether this field supports zero-copy
+	HasEncTag             bool // NEW: Whether field has "enc" or "encode" tag for deterministic encoding
+	EncOrder              int  // NEW: Sort order for deterministic encoding
+	SliceItem             int  // index of item if Type is Slice
+	ActualType            string
+	ResolvedType          *ResolvedTypeInfo `json:"resolved_type,omitempty"`
 }
 
 type StructInfo struct {
-	Name      string
-	Fields    []FieldInfo
-	Package   string
-	Options   GeneratorOptions
+	Name    string
+	Fields  []FieldInfo
+	Package string
+	Options GeneratorOptions
 }
 
 type Package struct {
-	Package string
+	Package    string
 	CustomType string
 }
 type CodeGenerator struct {
-	structs   []StructInfo
-	structMap map[string]bool
-	options   GeneratorOptions
-	packages []Package
+	structs     []StructInfo
+	structMap   map[string]bool
+	options     GeneratorOptions
+	packages    []Package
 	rootPackage string
-	mu sync.Mutex
+	mu          sync.Mutex
 }
 
 // Template helper functions
@@ -134,12 +138,13 @@ var templateFuncs = template.FuncMap{
 		}
 		return preceding
 	},
-	"unmarshalBasicTypeTemplate":  func(field FieldInfo) string {
+	"unmarshalBasicTypeTemplate": func(field FieldInfo) string {
 		return UnmarshalBasicTypeFieldTemplate(field)
 	},
 }
+
 // Complete template with all necessary functions
-const helperTemplate =  templates.HelperTemplate
+const helperTemplate = templates.HelperTemplate
 
 // Complete template with all necessary functions
 const completeCodeTemplate = templates.MainTemplate
@@ -158,31 +163,31 @@ func canFieldZeroCopy(fieldType string) bool {
 		"float32": true,
 		"bool":    true,
 	}
-	
+
 	return zeroCopyTypes[fieldType]
 }
 
 // Enhanced parsing with zero-copy option detection
 func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOptions) {
-	
+
 	if commentGroup == nil {
 		return false, DefaultOptions()
 	}
-	
+
 	options := DefaultOptions()
 	found := false
-	
+
 	for _, comment := range commentGroup.List {
 		line := strings.TrimSpace(comment.Text)
-		
+
 		if strings.HasPrefix(line, "//go:generate borshgen") {
-			
+
 			found = true
-			
+
 			parts := strings.Fields(line)
 			for i := 2; i < len(parts); i++ {
 				option := parts[i]
-				
+
 				if strings.HasPrefix(option, "-tag=") {
 					options.PrimaryTag = strings.TrimPrefix(option, "-tag=")
 				} else if strings.HasPrefix(option, "-fallback=") {
@@ -200,7 +205,7 @@ func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOption
 			break
 		}
 	}
-	
+
 	return found, options
 }
 
@@ -222,33 +227,32 @@ func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOpti
 	if field.Tag == nil {
 		return "", false, false, ""
 	}
-	
+
 	tagString := strings.Trim(field.Tag.Value, "`")
 	tag := reflect.StructTag(tagString)
 
 	structTag := reflect.StructTag(tag)
-// Check for "enc" or "encode" tag first
+	// Check for "enc" or "encode" tag first
 	_, hasEncTag := structTag.Lookup(options.EncodeTag)
 	// if !hasEncTag  {
 	// 	_,	hasEncTag = structTag.Lookup("encode")
 	// }
-	
+
 	if options.IgnoreTag == "" {
 		options.IgnoreTag = "-"
 	}
 	if primaryTag := tag.Get(options.PrimaryTag); primaryTag != "" {
-		
+
 		if primaryTag == options.IgnoreTag {
-			
-		
+
 			return "", true, hasEncTag, ""
 		}
 		parts := strings.Split(primaryTag, ",")
-	
+
 		if len(parts) == 1 {
 			return parts[0], false, hasEncTag, ""
 		}
-			return parts[0], false, hasEncTag, parts[1]
+		return parts[0], false, hasEncTag, parts[1]
 	} else {
 
 		if fallbackTag := tag.Get(options.FallbackTag); fallbackTag != "" {
@@ -256,20 +260,18 @@ func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOpti
 				return "", true, hasEncTag, ""
 			}
 			parts := strings.Split(fallbackTag, ",")
-			
+
 			return parts[0], false, hasEncTag, ""
 		}
 	}
 	return "", false, hasEncTag, ""
 }
 
-
-
 // parseStructs parses Go source files to extract struct information with full package resolution
 func (cg *CodeGenerator) parseStructs(filename string) error {
 	// Get the directory containing the file to load the entire package
 	dir := filepath.Dir(filename)
-	
+
 	// Configure package loading with all necessary information
 	cfg := &packages.Config{
 		Mode: packages.NeedName |
@@ -300,8 +302,7 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 
 	pkg := pkgs[0] // Get the main package
 	cg.rootPackage = pkg.PkgPath
-	
-	
+
 	// Find our target file in the package
 	var targetFile *ast.File
 	targetFilePath, err := filepath.Abs(filename)
@@ -327,7 +328,6 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 
 	// Use the package's type information (this includes all imports!)
 	info := pkg.TypesInfo
-	
 
 	// Helper function to find generate comment in multiple locations
 	findGenerateComment := func(genDecl *ast.GenDecl, typeSpec *ast.TypeSpec) (bool, GeneratorOptions) {
@@ -335,12 +335,12 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 		if found, options := parseGenerateComment(genDecl.Doc); found {
 			return found, options
 		}
-		
+
 		// Try typeSpec.Doc (sometimes comments are attached here)
 		if found, options := parseGenerateComment(typeSpec.Doc); found {
 			return found, options
 		}
-		
+
 		// Try file-level comments if this is the first/only declaration
 		if len(targetFile.Decls) > 0 && targetFile.Decls[0] == genDecl {
 			for _, commentGroup := range targetFile.Comments {
@@ -349,7 +349,7 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 				}
 			}
 		}
-		
+
 		return false, DefaultOptions()
 	}
 
@@ -383,7 +383,7 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 							if found, options := findGenerateComment(node, typeSpec); found {
 								options.PackageName = packageName
 								cg.options = options
-								
+
 								// Pass the package for enhanced type resolution
 								structInfo := cg.extractStructInfo(typeSpec.Name.Name, structType, options, info, pkg)
 								cg.structs = append(cg.structs, structInfo)
@@ -428,7 +428,7 @@ func (cg *CodeGenerator) parseStructsFallback(filename string) error {
 
 	// Rest of your original logic...
 	// (I'll omit the duplicated code for brevity, but it would be the same as your original)
-	
+
 	return nil
 }
 
@@ -450,13 +450,13 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 		for _, name := range field.Names {
 			actualType := ""
 			var resolvedTypeInfo *ResolvedTypeInfo
-			
+
 			// Enhanced type extraction with package context
 			if typeInfo != nil {
 				if fieldType, ok := typeInfo.Types[field.Type]; ok {
 					underlying := fieldType.Type.Underlying()
 					actualType = strings.ReplaceAll(underlying.String(), options.PackageName+".", "")
-					
+
 					// Extract detailed type information if we have package context
 					if pkgInfo != nil {
 						resolvedTypeInfo = cg.resolveTypeInfo(fieldType.Type, pkgInfo)
@@ -464,7 +464,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 			}
 			if resolvedTypeInfo != nil {
-			
+
 				if resolvedTypeInfo.ElementType != nil {
 					actualType = resolvedTypeInfo.ElementType.TypeName
 				}
@@ -472,45 +472,53 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, options)
 
 			// if resolvedTypeInfo != nil {
-				
+
 			// 	if resolvedTypeInfo.ElementType != nil && resolvedTypeInfo.ElementType.TypeName != "" {
 			// 		fieldInfo.ElementType = (resolvedTypeInfo.ElementType.TypeName)[strings.LastIndex(resolvedTypeInfo.ElementType.TypeName, ".")+1:]
-						
-					
+
 			// 	}
 			// 	if resolvedTypeInfo.UnderlyingType != nil {
 			// 		// fmt.Println("nRESOVEDTYPE: ",  resolvedTypeInfo.UnderlyingType.String())
-					// if fieldInfo.IsSlice || fieldInfo.IsBasicPointerType {
-					// 	str :=  resolvedTypeInfo.UnderlyingType.String()
-					// 	fieldInfo.CustomElementTypeName = strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
-					// }
-					
+			// if fieldInfo.IsSlice || fieldInfo.IsBasicPointerType {
+			// 	str :=  resolvedTypeInfo.UnderlyingType.String()
+			// 	fieldInfo.CustomElementTypeName = strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
+			// }
+
 			// 		fieldInfo.CustomTypeName = fieldInfo.Type
-					
+
 			// 		if !fieldInfo.IsBasicType {
 			// 			fieldInfo.IsBasicType = isBasicType(resolvedTypeInfo.UnderlyingType.String())
 			// 		}
-					
+
 			// 		fieldInfo.ActualType = resolvedTypeInfo.UnderlyingType.String()
 			// 		fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
 			// 	}
-			
+
 			// }
 			// fmt.Println("nTYPPPPE: ", fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName, fieldInfo.CustomElementTypeName)
-			
+
 			// Enhance field info with resolved type information
-			
-			if resolvedTypeInfo != nil && !fieldInfo.IsBasicType {
+			specialTypes := map[string]bool{
+				"time.Time":                   true,
+				"json.RawMessage":             true,
+				"github.com/google/uuid.UUID": true,
+			}
+			fmt.Println("TYPESSSS", fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName, fieldInfo.CustomElementTypeName, fieldInfo.IsBasicType, fieldInfo.IsSlice, fieldInfo.IsPointer, fieldInfo.IsMap, fieldInfo.IsInterface)
+			if resolvedTypeInfo != nil && !fieldInfo.IsBasicType && !specialTypes[fieldInfo.CustomTypeName] {
 				if fieldInfo.Name == "StateHashes" {
 					fmt.Printf("\nSTATEHSAHS %+v", resolvedTypeInfo.ElementType.ElementType)
 				}
 				fieldInfo.ResolvedType = resolvedTypeInfo
 				if len(resolvedTypeInfo.FullTypeName) > 0 {
-					if  resolvedTypeInfo.ElementType != nil {
+					if resolvedTypeInfo.ElementType != nil {
 						// fmt.Printf("\nXXXXType: %s; ElementType: %s; %+v", resolvedTypeInfo.TypeName,  resolvedTypeInfo.ElementType.TypeName, resolvedTypeInfo.UnderlyingType)
-						fieldInfo.CustomTypeName = resolvedTypeInfo.TypeName
+						if len(fieldInfo.CustomTypeName) == 0 {
+							fieldInfo.CustomTypeName = resolvedTypeInfo.TypeName
+						}
 						fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
-						fieldInfo.ElementType =resolvedTypeInfo.ElementType.TypeName
+						if len(resolvedTypeInfo.ElementType.TypeName)	> 0 {
+							fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
+						}
 					}
 					if isBasicType(fieldInfo.CustomTypeName) {
 						fieldInfo.CustomTypeName = ""
@@ -518,13 +526,13 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 					pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
 					ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
 					cg.mu.Lock()
-					if pkg != cg.rootPackage {
+					if pkg != cg.rootPackage && !specialTypes[ctype] {
 						fmt.Printf("FULLTYPENAME: %s", pkg)
 						if !slices.ContainsFunc(cg.packages, func(p Package) bool {
 							return strings.EqualFold(p.Package, pkg)
 						}) {
 							cg.packages = append(cg.packages, Package{
-								Package: pkg,
+								Package:    pkg,
 								CustomType: ctype,
 							})
 						}
@@ -534,7 +542,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// if len(resolvedTypeInfo.UnderlyingType.String()) > 0 {
 				// //fmt.Println("nTYPPPPE2: ", resolvedTypeInfo.TypeName)
 				// 	fieldInfo.ElementType = strings.ReplaceAll(resolvedTypeInfo.UnderlyingType.String(), "*", "")
-					
+
 				// 	str := fieldInfo.ActualType
 				// 	fmt.Printf("\nPackageName::: %s - %s", options.PackageName, str)
 				// 	fieldInfo.CustomTypeName = strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
@@ -550,32 +558,31 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// 			}
 				// 	}
 				// }
-				
-				
+
 			}
-			
+
 			if !fieldInfo.ShouldIgnore {
 				structInfo.Fields = append(structInfo.Fields, fieldInfo)
 			}
 		}
 	}
-	
+
 	return structInfo
 }
 
 // ResolvedTypeInfo contains detailed information about a resolved type
 type ResolvedTypeInfo struct {
-	PackagePath   string     // e.g., "github.com/google/uuid"
-	PackageName   string     // e.g., "uuid"  
-	TypeName      string     // e.g., "UUID"
-	FullTypeName  string     // e.g., "github.com/google/uuid.UUID"
-	IsImported    bool       // true if from external package
-	IsBasic       bool       // true for built-in types
-	IsSlice       bool
-	IsPointer     bool
-	IsStruct      bool
-	ElementType   *ResolvedTypeInfo // for slices/arrays/pointers
-	UnderlyingType types.Type       // the actual Go type
+	PackagePath    string // e.g., "github.com/google/uuid"
+	PackageName    string // e.g., "uuid"
+	TypeName       string // e.g., "UUID"
+	FullTypeName   string // e.g., "github.com/google/uuid.UUID"
+	IsImported     bool   // true if from external package
+	IsBasic        bool   // true for built-in types
+	IsSlice        bool
+	IsPointer      bool
+	IsStruct       bool
+	ElementType    *ResolvedTypeInfo // for slices/arrays/pointers
+	UnderlyingType types.Type        // the actual Go type
 }
 
 // resolveTypeInfo extracts detailed type information
@@ -583,7 +590,7 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package) *R
 	info := &ResolvedTypeInfo{
 		UnderlyingType: t,
 	}
-	
+
 	switch typ := t.(type) {
 	case *types.Named:
 		// This is a named type (could be from another package)
@@ -593,63 +600,62 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package) *R
 			info.PackageName = obj.Pkg().Name()
 			info.TypeName = obj.Name()
 			info.FullTypeName = fmt.Sprintf("%s.%s", obj.Pkg().Path(), obj.Name())
-			
+
 			// Check if it's from an external package
 			if obj.Pkg() != pkg.Types {
 				info.IsImported = true
 			}
-			
+
 			// Check if underlying type is a struct
 			if _, ok := typ.Underlying().(*types.Struct); ok {
 				info.IsStruct = true
 			}
-			
+
 			underlyingInfo := cg.resolveTypeInfo(typ.Underlying(), pkg)
 			info.UnderlyingType = underlyingInfo.UnderlyingType
-            info.IsStruct = underlyingInfo.IsStruct
-            info.IsBasic = underlyingInfo.IsBasic
-            info.IsSlice = underlyingInfo.IsSlice
-            info.IsPointer = underlyingInfo.IsPointer
-            info.ElementType = underlyingInfo.ElementType
+			info.IsStruct = underlyingInfo.IsStruct
+			info.IsBasic = underlyingInfo.IsBasic
+			info.IsSlice = underlyingInfo.IsSlice
+			info.IsPointer = underlyingInfo.IsPointer
+			info.ElementType = underlyingInfo.ElementType
 		}
-		
+
 	case *types.Basic:
 		info.TypeName = typ.Name()
 		info.IsBasic = true
-		
+
 	case *types.Slice:
 		info.IsSlice = true
 		// Recursively analyze element type
 		info.ElementType = cg.resolveTypeInfo(typ.Elem(), pkg)
-		
+
 	case *types.Pointer:
 		info.IsPointer = true
 		// Analyze pointed-to type
 		info.ElementType = cg.resolveTypeInfo(typ.Elem(), pkg)
-		
+
 	case *types.Struct:
 		info.IsStruct = true
 		info.TypeName = "struct"
 	}
-	
+
 	return info
 }
-
 
 // Helper method to check if a field is a known imported type that needs special handling
 func (fi *FieldInfo) KnownImportedType() string {
 	if fi.ResolvedType == nil || !fi.ResolvedType.IsImported {
 		return ""
 	}
-	
+
 	// Add known types that you want to handle specially
 	knownTypes := map[string]string{
-		"time.Time":             "struct",
+		"time.Time":                   "struct",
 		"github.com/google/uuid.UUID": "[16]byte",
 		"encoding/json.RawMessage":    "[]byte",
 		// Add more as needed
 	}
-	
+
 	return knownTypes[fi.ResolvedType.FullTypeName]
 }
 
@@ -658,17 +664,57 @@ func (fi *FieldInfo) GetMarshalCode(varName string) (string, bool) {
 	if fi.ResolvedType == nil || !fi.ResolvedType.IsImported {
 		return "", false
 	}
-	
+
 	switch fi.ResolvedType.FullTypeName {
 	case "time.Time":
 		return fmt.Sprintf("binary.LittleEndian.PutUint64(buf[offset:], uint64(%s.Unix()))", varName), true
 	case "github.com/google/uuid.UUID", "encoding/json.RawMessage":
 		return fmt.Sprintf("copy(buf[offset:], %s[:])", varName), true
-		
+
 	default:
 		return "", false
 	}
 }
+
+// Helper method to get the marshal code for known types
+func (fieldInfo *FieldInfo) assignCustomEncoder(_fieldType string, prefix string) error {
+	
+	fmt.Println("ASSIGNCUSTOMENCODER", prefix, _fieldType, fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName)
+	switch _fieldType {
+	case "time.Time":
+		fieldInfo.Type = "uint64"
+		fieldInfo.CustomTypeName = prefix + "time.Time"
+		fieldInfo.CustomElementTypeName = "time.Time"
+		fieldInfo.CustomEncoder = "_CustomTimeTimeEncoder"
+		fieldInfo.ElementType = "time.Time"
+		fieldInfo.IsCustomEncoder = true
+
+	case "json.RawMessage", "*json.RawMessage":
+
+		fieldInfo.Type = "[]byte"
+		fieldInfo.CustomElementTypeName = "json.RawMessage"
+		fieldInfo.CustomTypeName = prefix + "json.RawMessage"
+		fieldInfo.CustomEncoder = "_CustomJsonRawMessageEncoder"
+		fieldInfo.ElementType = "json.RawMessage"
+		fieldInfo.IsCustomEncoder = true
+
+	case "uuid.UUID":
+		fieldInfo.Type = "[16]byte"
+		fieldInfo.CustomElementTypeName = "uuid.UUID"
+		fieldInfo.CustomTypeName = prefix + "uuid.UUID"
+		fieldInfo.CustomEncoder = "_CustomUuidUUIDEncoder"
+		fieldInfo.ElementType = "json.RawMessage"
+		fieldInfo.IsCustomEncoder = true
+	default:
+		return fmt.Errorf("unsupported custom encoder type: %s", fieldInfo.CustomTypeName)
+	}
+	fieldInfo.Type = fieldInfo.ElementType
+	fieldInfo.IsCustomType = true
+	fieldInfo.IsCustomEncoder = true
+	return nil
+
+}
+
 // extractFieldInfo extracts information from a field
 func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualType string, options GeneratorOptions) FieldInfo {
 	fieldInfo := FieldInfo{
@@ -680,9 +726,9 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 	fieldInfo.BinaryTag = binaryTag
 	fieldInfo.ShouldIgnore = shouldIgnore
 	fieldInfo.HasEncTag = hasEncTag
-	
+
 	if len(customEncoder) > 0 {
-		if !strings.HasPrefix(customEncoder, "[]") &&  !strings.HasPrefix(customEncoder, "[][]") {
+		if !strings.HasPrefix(customEncoder, "[]") && !strings.HasPrefix(customEncoder, "[][]") {
 			fieldInfo.IsCustomType = true
 			fieldInfo.CustomTypeName = fieldInfo.Type
 			if isBasicType(customEncoder) {
@@ -691,35 +737,32 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 				fieldInfo.CustomEncoder = customEncoder
 				fieldInfo.IsCustomEncoder = true
 			}
-		} 
-	}  else {
+		}
+	} else {
 		if isBasicType(actualType) || actualType == "[]byte" {
 			// customEncoder = actualType
 		}
 	}
 	if len(actualType) > 0 {
 		fieldInfo.ActualType = actualType
-		
+
 	}
-		
-	
-	
+
 	if shouldIgnore {
 		return fieldInfo
 	}
-	
+
 	// If no tag found, use field name
 	if fieldInfo.BinaryTag == "" {
 		fieldInfo.BinaryTag = strings.ToLower(name)
 	}
-	
-	
-		
+
 	// Extract type information
 	switch t := field.Type.(type) {
 	case *ast.Ident:
-		
+
 		fieldInfo.Type = t.Name
+
 		fieldInfo.IsBasicType = isBasicType(t.Name) || isBasicType(customEncoder) || isBasicType(actualType)
 		fieldInfo.CanZeroCopy = canFieldZeroCopy(t.Name)
 		if cg.structMap[t.Name] || customEncoder == "struct" || customEncoder == "bin" {
@@ -728,9 +771,9 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 		// if fieldInfo.IsBasicType {
 		fieldInfo.ElementType = actualType
 		// }
-	
+
 	case *ast.StarExpr:
-		
+
 		fieldInfo.IsPointer = true
 		fieldInfo.PointerRef = "&"
 		fieldInfo.PointerDeref = "*"
@@ -746,45 +789,75 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 				fieldInfo.IsStruct = true
 			}
 			fieldInfo.CustomElementTypeName = ident.Name
-			
+
 		}
 		if t, ok := t.X.(*ast.ArrayType); ok {
 			if t.Len == nil { // slice
-			
-			fieldInfo.IsPointerSlice = true
-			if ident, ok := t.Elt.(*ast.Ident); ok {
-				elementType := ident.Name
-				if len(customEncoder) > 0  {
-					elementType = customEncoder[2:]
-				}
-				fieldInfo.Type = "[]" + elementType
-				fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
-				// fieldInfo.ElementType = ident.Name
-				fieldInfo.IsPointerElement = strings.HasPrefix(elementType, "*")
-				fieldInfo.CustomTypeName = "[]" + ident.Name
-				fieldInfo.CustomElementTypeName = ident.Name
-				
-				fieldInfo.ElementType = strings.ReplaceAll(elementType, "*", "")
-				
-				// fieldInfo.IsBasicType = isBasicType(ident.Name)
-				if cg.structMap[ident.Name] {
-					fieldInfo.IsStruct = true
-				}
-			
-				fmt.Println("CustomeElementName", fieldInfo.Name, fieldInfo.CustomElementTypeName, )
 
+				fieldInfo.IsPointerSlice = true
+				if ident, ok := t.Elt.(*ast.Ident); ok {
+					elementType := ident.Name
+					if len(customEncoder) > 0 {
+						elementType = customEncoder[2:]
+					}
+					fieldInfo.Type = "[]" + elementType
+					fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
+					// fieldInfo.ElementType = ident.Name
+					fieldInfo.IsPointerElement = strings.HasPrefix(elementType, "*")
+					fieldInfo.CustomTypeName = "[]" + ident.Name
+					fieldInfo.CustomElementTypeName = ident.Name
+
+					fieldInfo.ElementType = strings.ReplaceAll(elementType, "*", "")
+
+					// fieldInfo.IsBasicType = isBasicType(ident.Name)
+					if cg.structMap[ident.Name] {
+						fieldInfo.IsStruct = true
+					}
+
+					fmt.Println("CustomeElementName", fieldInfo.Name, fieldInfo.CustomElementTypeName)
+
+				}
+			}
+			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
+				if pkgIdent, ok := t.X.(*ast.Ident); ok {
+
+					name := pkgIdent.Name + "." + t.Sel.Name
+					fieldInfo.Type = "*" + name
+					fieldInfo.ActualType = fieldInfo.Type
+					fieldInfo.IsCustomType = true
+					actualType = fieldInfo.Type
+					
+
+					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
+						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+					}
+					
+				}
 			}
 		}
-		}
-	
+		if t, ok := t.X.(*ast.SelectorExpr); ok {
+				if pkgIdent, ok := t.X.(*ast.Ident); ok {
+
+					name := pkgIdent.Name + "." + t.Sel.Name
+					fieldInfo.Type = "*" + name
+					fieldInfo.ActualType = fieldInfo.Type
+					fieldInfo.IsCustomType = true
+					actualType = fieldInfo.Type
+
+					if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
+						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+					}
+				}
+			}
+
 	case *ast.ArrayType:
-		
+
 		if t.Len == nil { // slice
 			fieldInfo.IsSlice = true
 			if ident, ok := t.Elt.(*ast.Ident); ok {
-				
+
 				elementType := ident.Name
-				if len(customEncoder) > 0  {
+				if len(customEncoder) > 0 {
 					elementType = customEncoder[2:]
 				}
 				fieldInfo.Type = "[]" + elementType
@@ -800,8 +873,8 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 				if cg.structMap[ident.Name] {
 					fieldInfo.IsStruct = true
 				}
-				
-			} 
+
+			}
 			if t, ok := t.Elt.(*ast.StarExpr); ok {
 				fieldInfo.IsPointerElement = true
 				fieldInfo.ElementPointerRef = "&"
@@ -818,38 +891,67 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 					// 	fieldInfo.IsStruct = true
 					// }
 				}
-				
-			}  
+				if t, ok := t.X.(*ast.SelectorExpr); ok {
+					if ident, ok := t.X.(*ast.Ident); ok {
+						fieldInfo.CustomTypeName = "[]*" + ident.Name + "." + t.Sel.Name
+						fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
+
+
+
+							name := ident.Name + "." + t.Sel.Name
+							fieldInfo.Type = "[]*" + name
+							fieldInfo.ActualType = fieldInfo.Type
+							fieldInfo.IsCustomType = true
+							actualType = fieldInfo.Type
+
+							if err := (&fieldInfo).assignCustomEncoder(name, "[]*"); err != nil {
+								fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+							}
+						
+
+					}
+			}
+
+			}
 			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
 				if ident, ok := t.X.(*ast.Ident); ok {
-					fieldInfo.CustomTypeName = "[]" + ident.Name +"."+t.Sel.Name
-					fieldInfo.CustomElementTypeName = ident.Name +"."+t.Sel.Name
+					fieldInfo.CustomTypeName = "[]" + ident.Name + "." + t.Sel.Name
+					fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
+
+
+
+						name := ident.Name + "." + t.Sel.Name
+						fieldInfo.Type = "*" + name
+						fieldInfo.ActualType = fieldInfo.Type
+						fieldInfo.IsCustomType = true
+						actualType = fieldInfo.Type
+
+						if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
+							fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+						}
+					
+
 				}
-				
-				
-				
-			}  
+			}
 			if t, ok := t.Elt.(*ast.ArrayType); ok {
-			
+
 				if ident, ok := t.Elt.(*ast.Ident); ok {
 					elementType := ident.Name
-					if len(customEncoder) > 0  {
-						elementType = strings.ReplaceAll(customEncoder, "[]","")
+					if len(customEncoder) > 0 {
+						elementType = strings.ReplaceAll(customEncoder, "[]", "")
 					}
 					fieldInfo.Type = "[][]" + elementType
 					fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
-					fieldInfo.CustomElementTypeName = "[]" +  ident.Name
-					fieldInfo.ElementType = "[]"+strings.ReplaceAll(elementType, "*", "")
-					
+					fieldInfo.CustomElementTypeName = "[]" + ident.Name
+					fieldInfo.ElementType = "[]" + strings.ReplaceAll(elementType, "*", "")
+
 					// fieldInfo.IsBasicType = isBasicType(ident.Name)
 					if cg.structMap[ident.Name] {
 						fieldInfo.IsStruct = true
 					}
-					
-				} 
-				
-				
-			} 
+
+				}
+			}
 		}
 	case *ast.MapType:
 		fieldInfo.IsMap = true
@@ -857,137 +959,154 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 	case *ast.InterfaceType:
 		fieldInfo.IsInterface = true
 		fieldInfo.Type = "interface{}"
-	}
+	case *ast.SelectorExpr:
+		if pkgIdent, ok := t.X.(*ast.Ident); ok {
 
-
-	if  isBasicType(customEncoder) {
+			name := pkgIdent.Name + "." + t.Sel.Name
+			fieldInfo.Type = name
+			fieldInfo.ActualType = fieldInfo.Type
 			fieldInfo.IsCustomType = true
-			actualType = customEncoder
-		}
-		if  len(actualType) > 0 && actualType  !=  fieldInfo.Type {
-			fieldInfo.CustomTypeName = fieldInfo.Type
-			if !fieldInfo.IsSlice {
-				fieldInfo.Type = actualType
-				fieldInfo.IsCustomType = true
+			actualType = fieldInfo.Type
+
+			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
+				fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 			}
+
+		}
+	}
+	if isBasicType(customEncoder) {
+		fieldInfo.IsCustomType = true
+		actualType = customEncoder
+	}
+	if !fieldInfo.IsCustomEncoder &&  len(actualType) > 0 && actualType != fieldInfo.Type {
+		fieldInfo.CustomTypeName = fieldInfo.Type
+		if !fieldInfo.IsSlice {
+			fieldInfo.Type = actualType
+			fieldInfo.IsCustomType = true
 		}
 
+	}
 	return fieldInfo
 }
 
 // Get the code
 func (cg *CodeGenerator) getCode(outputFile string) (header *bytes.Buffer, main *bytes.Buffer, err error) {
-		helperTmpl, err := template.New("helper").Parse(helperTemplate)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse helper template: %v", err)
-		}
-		if err := helperTmpl.Execute(header, struct {
-			Package string
-			Options GeneratorOptions
-		}{
-			Package: cg.structs[0].Package,
-			Options: cg.options,
-		}); err != nil {
-			return nil, nil, fmt.Errorf("failed to execute helper template: %v", err)
-		}
+	helperTmpl, err := template.New("helper").Parse(helperTemplate)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse helper template: %v", err)
+	}
+	if err := helperTmpl.Execute(header, struct {
+		Package string
+		Options GeneratorOptions
+	}{
+		Package: cg.structs[0].Package,
+		Options: cg.options,
+	}); err != nil {
+		return nil, nil, fmt.Errorf("failed to execute helper template: %v", err)
+	}
 	tmpl, err := template.New("binary").Funcs(templateFuncs).Parse(completeCodeTemplate)
 	if err != nil {
 		return header, main, err
 	}
-	
+
 	if len(cg.structs) == 0 {
-		return  header, main, fmt.Errorf("empty structs")
+		return header, main, fmt.Errorf("empty structs")
 	}
 	data := struct {
-		Package string
-		Structs []StructInfo
+		Package  string
+		Structs  []StructInfo
 		Packages []Package
-		Options GeneratorOptions
-		
+		Options  GeneratorOptions
 	}{
-		Package: cg.structs[0].Package,
-		Structs: cg.structs,
-		Options: cg.options,
+		Package:  cg.structs[0].Package,
+		Structs:  cg.structs,
+		Options:  cg.options,
 		Packages: cg.packages,
 	}
 
 	err = tmpl.Execute(main, data)
-	
-	return  header, main, err
+
+	return header, main, err
 }
+
 // generateCode generates the binary encoding/decoding code
-func (cg *CodeGenerator) generateCode(outputFile string) ( err error) {
+func (cg *CodeGenerator) generateCode(outputFile string) (err error) {
 
 	tmpl, err := template.New("binary").Funcs(templateFuncs).Parse(completeCodeTemplate)
 	if err != nil {
-		return  err
+		return err
 	}
-	
+
 	dir := filepath.Dir(outputFile)
-		hash := make([]byte, 4)
+	hash := make([]byte, 4)
 	if _, err := rand.Read(hash); err != nil {
 		return fmt.Errorf("failed to generate random hash: %v", err)
 	}
 
-	helperFile := filepath.Join(dir, "borshgen_common_" +  fmt.Sprint(xxhash.Sum64String(filepath.Base(dir))%1000000)+ "_gen.go")
+	helperFile := filepath.Join(dir, "borshgen_common_"+fmt.Sprint(xxhash.Sum64String(filepath.Base(dir))%10000000000)+"_gen.go")
 	// if _, err := os.Stat(helperFile); os.IsNotExist(err) {
-		// err := os.Remove(helperFile)
-		
-		helperOut, err := os.Create(helperFile)
-		if err != nil {
-			return fmt.Errorf("failed to create common_gen.go: %v", err)
-		}
-		
-		defer helperOut.Close()
+	// err := os.Remove(helperFile)
 
-		helperTmpl, err := template.New("helper").Parse(helperTemplate)
-		if err != nil {
-			return fmt.Errorf("failed to parse helper template: %v", err)
-		}
+	helperOut, err := os.Create(helperFile)
+	if err != nil {
+		return fmt.Errorf("failed to create common_gen.go: %v", err)
+	}
 
-		// if len(cg.structs) == 0 {
-		// 	return fmt.Errorf("no structs to generate")
-		// }
+	defer helperOut.Close()
 
-		if err := helperTmpl.Execute(helperOut, struct {
-			Package string
-			Options GeneratorOptions
-		}{
-			Package: cg.structs[0].Package,
-			Options: cg.options,
-		}); err != nil {
-			return  fmt.Errorf("failed to execute helper template: %v", err)
-		}
-	// } else if err != nil {
-	// 	return fmt.Errorf("failed to check common_gen.go: %v", err)
-	
+	helperTmpl, err := template.New("helper").Parse(helperTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse helper template: %v", err)
+	}
+
+	// if len(cg.structs) == 0 {
+	// 	return fmt.Errorf("no structs to generate")
 	// }
+
+	if err := helperTmpl.Execute(helperOut, struct {
+		Package string
+		Options GeneratorOptions
+	}{
+		Package: cg.structs[0].Package,
+		Options: cg.options,
+	}); err != nil {
+		return fmt.Errorf("failed to execute helper template: %v", err)
+	}
+
+
+	// copy the custom encoder file
+	encoderFile := filepath.Join(dir, "borshgen_custom_encoder_"+fmt.Sprint(xxhash.Sum64String(filepath.Base(dir))%10000000000)+"_gen.go")
+	str := string(customEncodersBytes)
+	ce := strings.Replace(str, "package generator", "package "+cg.structs[0].Package, 1)
+	ce = "// Code generated by bingen. DO NOT EDIT."	 + "\n" + ce
+	err = os.WriteFile(encoderFile, []byte(ce), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to copy custom encoders: %v", err)
+	}
 	file, err := os.Create(outputFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	
+
 	if len(cg.structs) == 0 {
 		return fmt.Errorf("empty structs")
 	}
 	data := struct {
-		Package string
-		Structs []StructInfo
+		Package  string
+		Structs  []StructInfo
 		Packages []Package
-		Options GeneratorOptions
-		
+		Options  GeneratorOptions
 	}{
-		Package: cg.structs[0].Package,
-		Structs: cg.structs,
-		Options: cg.options,
+		Package:  cg.structs[0].Package,
+		Structs:  cg.structs,
+		Options:  cg.options,
 		Packages: cg.packages,
 	}
 
-
 	err = tmpl.Execute(file, data)
-	
-	return  err
+
+	return err
 }
 
 func (cg *CodeGenerator) sortEncFields(fields []FieldInfo) {
@@ -998,14 +1117,13 @@ func (cg *CodeGenerator) sortEncFields(fields []FieldInfo) {
 			encFields = append(encFields, field)
 		}
 	}
-	
+
 	// Sort by binary tag name
 	sort.Slice(encFields, func(i, j int) bool {
 		return encFields[i].BinaryTag < encFields[j].BinaryTag
 	})
 
-	
-	// Assign order indices back to original fields  
+	// Assign order indices back to original fields
 	for i, encField := range encFields {
 		for j := range fields {
 			if fields[j].Name == encField.Name {
@@ -1017,11 +1135,11 @@ func (cg *CodeGenerator) sortEncFields(fields []FieldInfo) {
 	sort.Slice(fields, func(i, j int) bool {
 		return fields[i].EncOrder < fields[j].EncOrder
 	})
-	
+
 }
 
 // Generate is the main entry point for code generation
-func GenerateDir(path, primaryTag, fallbackTag,  encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
+func GenerateDir(path, primaryTag, fallbackTag, encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("failed to stat path: %w", err)
@@ -1038,36 +1156,33 @@ func GenerateDir(path, primaryTag, fallbackTag,  encodeTag string, ignoreTag str
 		if err != nil {
 			return err
 		}
-		
-		
+
 		if d.IsDir() {
 			return nil // continue walking
 		}
-		if strings.HasSuffix(p, ".go") && !strings.HasSuffix(p, "_gen.go")  && !strings.HasSuffix(p, "test.go") {
-			fmt.Printf("ProcessingFile: %v", p)	
-			fmt.Println()	
-			tmp  := strings.TrimSuffix(p, ".go") + "_" + hex.EncodeToString(hash)+"_tmp_gen.go"
+		if strings.HasSuffix(p, ".go") && !strings.HasSuffix(p, "_gen.go") && !strings.HasSuffix(p, "test.go") {
+			fmt.Printf("ProcessingFile: %v", p)
+			fmt.Println()
+			tmp := strings.TrimSuffix(p, ".go") + "_" + hex.EncodeToString(hash) + "_tmp_gen.go"
 			defer os.Remove(tmp)
-			err := Generate(p, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen) 
-			if err  != nil {
+			err := Generate(p, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
+			if err != nil {
 				fmt.Printf("CodeGentError: %v", err)
 				if !strings.Contains(err.Error(), "no structs found") {
-						return err
+					return err
 				}
 				return nil
 			}
-		
-			
-				finalFile  := strings.TrimSuffix(p, ".go")  + "_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(p)))%1000000) + "_gen.go"
-				return trimFile(tmp, finalFile)
-			}
+
+			finalFile := strings.TrimSuffix(p, ".go") + "_" + fmt.Sprint(xxhash.Sum64String(filepath.Base(filepath.Dir(p)))%10000000000) + "_gen.go"
+			return trimFile(tmp, finalFile)
+		}
 
 		return nil
 	})
 }
 
 func trimFile(inputFile, outputFile string) error {
-	
 
 	// Step 1: Read entire file into memory
 	file, err := os.Open(inputFile)
@@ -1120,8 +1235,9 @@ func trimFile(inputFile, outputFile string) error {
 	return writer.Flush()
 
 }
+
 // Generate is the main entry point for code generation
-func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string,  ignoreTag string, usePooling bool, maxStringLen int) error {
+func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
 	if len(outputFile) == 0 {
 		outputFile = strings.TrimSuffix(inputFile, ".go") + "_gen.go"
 	}
@@ -1136,9 +1252,9 @@ func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, 
 		MaxSliceLen:  65535,
 		ZeroCopy:     false,
 		SafeMode:     true,
-		EncodeTag: encodeTag,
+		EncodeTag:    encodeTag,
 	}
-	
+
 	err := cg.parseStructs(inputFile)
 	if err != nil {
 		return fmt.Errorf("error parsing structs: %v", err)
@@ -1162,7 +1278,7 @@ func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, 
 		fmt.Print(s.Name)
 	}
 	fmt.Println()
-	
+
 	// Show configuration
 	fmt.Printf("Configuration:\n")
 	fmt.Printf("  Primary tag: %s\n", primaryTag)
@@ -1171,13 +1287,13 @@ func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, 
 	}
 	fmt.Printf("  Ignore value: %s\n", ignoreTag)
 	fmt.Printf("  Buffer pooling: %t\n", usePooling)
-	
+
 	// Show field tag usage
 	for _, s := range cg.structs {
 		primaryCount := 0
 		fallbackCount := 0
 		ignoredCount := 0
-		
+
 		for _, f := range s.Fields {
 			if f.ShouldIgnore {
 				ignoredCount++
@@ -1187,8 +1303,8 @@ func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, 
 				fallbackCount++
 			}
 		}
-		
-		fmt.Printf("  %s: %d primary tags, %d fallback tags, %d ignored\n", 
+
+		fmt.Printf("  %s: %d primary tags, %d fallback tags, %d ignored\n",
 			s.Name, primaryCount, fallbackCount, ignoredCount)
 	}
 	return nil
@@ -1209,7 +1325,7 @@ func GenerateWithZeroCopy(inputFile, primaryTag, fallbackTag, ignoreTag string, 
 		ZeroCopy:     zeroCopy,
 		SafeMode:     safeMode,
 	}
-	
+
 	err := cg.parseStructs(inputFile)
 	if err != nil {
 		return fmt.Errorf("error parsing structs: %v", err)
@@ -1233,7 +1349,7 @@ func GenerateWithZeroCopy(inputFile, primaryTag, fallbackTag, ignoreTag string, 
 		fmt.Print(s.Name)
 	}
 	fmt.Println()
-	
+
 	// Show configuration
 	fmt.Printf("Configuration:\n")
 	fmt.Printf("  Primary tag: %s\n", primaryTag)
@@ -1246,7 +1362,6 @@ func GenerateWithZeroCopy(inputFile, primaryTag, fallbackTag, ignoreTag string, 
 	if zeroCopy {
 		fmt.Printf("  Safe mode: %t\n", safeMode)
 	}
-	
+
 	return nil
 }
-

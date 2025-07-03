@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"encoding/json"
 	"math"
 	"reflect"
 	"testing"
@@ -15,6 +16,7 @@ func TestBinaryEncoding(t *testing.T) {
 	optionalCounter := int32(42)
 	optionalFlag := true
 	optionalScore := 99.5
+	rawMessage := json.RawMessage(`{"key": "value"}`)
 	
 	original := Event{
 		ID:        testID,
@@ -24,7 +26,7 @@ func TestBinaryEncoding(t *testing.T) {
 		Counter:   -123,
 		Flag:      true,
 		Score:     3.14159,
-		Rating:    2.5,
+		Rating                                          :    2.5,
 		Systems:   []System{"auth", "logging", "metrics"},
 		Tags:      []string{"urgent", "production", "critical"},
 	
@@ -44,6 +46,17 @@ func TestBinaryEncoding(t *testing.T) {
 		OptionalFlag:    &optionalFlag,
 		OptionalScore:   &optionalScore,
 		Ignored:         "this should be ignored",
+		JsonData: json.RawMessage(`{"key": "value"}`),
+		JsonPtrData: &rawMessage,
+		JsonSliceData: []json.RawMessage{
+			json.RawMessage(`{"slice_key1": "slice_value1"}`),
+			json.RawMessage(`{"slice_key2": "slice_value2"}`),
+		},
+		JsonPointerSliceData: &[]json.RawMessage{
+			json.RawMessage(`{"pointer_slice_key1": "pointer_slice_value1"}`),
+			json.RawMessage(`{"pointer_slice_key2": "pointer_slice_value2"}`),
+		},
+		
 	}
 
 	t.Run("BinarySize", func(t *testing.T) {
@@ -187,6 +200,10 @@ func TestBinaryEncoding(t *testing.T) {
 
 		// Verify ignored field is not affected
 		if restored.Ignored != "" {
+			t.Errorf("Ignored field should be empty, got: %s", restored.Ignored)
+		}
+		// Verify ignored field is not affected
+		if bytes.Equal(restored.JsonData, original.JsonData) == false {
 			t.Errorf("Ignored field should be empty, got: %s", restored.Ignored)
 		}
 	})

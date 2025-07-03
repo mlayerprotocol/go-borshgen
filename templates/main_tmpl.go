@@ -7,6 +7,7 @@ package {{.Package}}
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -19,6 +20,7 @@ import (
 var _ = fmt.Print
 var _ = errors.New("")
 var _ = binary.MaxVarintLen16
+var _  json.RawMessage
 var _  =  math.Pi
 var _ = fmt.Print
 {{range .Structs}}
@@ -220,7 +222,7 @@ func (v *{{.Name}}View) calculateFieldOffset(fieldName string) int {
 				length = binary.LittleEndian.Uint16(v.data[offset:offset+2])
 				offset += 2 + int(length)
 			{{else if and .IsPointer (not .IsPointerSlice)}}
-				offset += 1 // nil marker
+				offset += 1 // non-nil marker
 				if offset > 0 && offset-1 < len(v.data) && v.data[offset-1] != 0 {
 					if offset+2 > len(v.data) {
 						return -1
@@ -298,10 +300,23 @@ func (s *{{.Name}}) Encode() ([]byte, error) {
 		{{end}}
 			
 		{{ if .IsCustomEncoder }}
-		 	_b := {{ .CustomeEncoder }}.Encode(vv)
-			if len(_b) > 0 {
-		 		result = append(result, _b...)
-			}
+		 	{{ if or .IsSlice .IsPointerSlice}}
+				for _, item := range vv {
+					b, err := ({{.CustomEncoder}}.Encode(item))
+					if err != nil {
+						return nil, fmt.Errorf("failed to encode field {{.Name}}: %v", err)
+					}
+					result = append(result, (b)...)
+				}
+			{{else}}
+				_b, err := {{ .CustomEncoder }}.Encode(vv)
+				if err != nil {
+						return nil, fmt.Errorf("failed to encode field {{.Name}}: %v", err)
+					}
+				if len(_b) > 0 {
+					result = append(result, _b...)
+				}
+			{{end}}
 		{{else if .IsBasicType}}
 			{{if eq .Type "string"}}
 				result = append(result, []byte(vv)...)
@@ -366,9 +381,7 @@ func (s *{{.Name}}) Encode() ([]byte, error) {
 			{{end}}
 		{{else if and .IsPointer (not .IsPointerSlice) }}
 
-			if s.{{.Name}} == nil {
-				return result, nil
-			}
+			
 			{{if eq .ElementType "bool"}}
 				if *s.{{.Name}} {
 					result = append(result, 1)
@@ -755,24 +768,52 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 	{{range .Fields}}
 		{{if not .ShouldIgnore}}
 		{
+		{{if .IsPointer}}
+		if s.{{.Name}} == nil {
+			buf = append(buf, 0) // nil marker
+			goto SKIP{{.Name}}
+		} else {
+		 	buf = append(buf, 1) // non-nil marker
+		}
 
-			{{if .IsCustomEncoder }}
-		  
-				nestedData, err := {{.CustomEncoder}}.MarshalBinary(s.{{.Name}})
-					if err != nil {
-						return nil, fmt.Errorf("failed to marshal nested struct {{.Name}}: %v", err)
-					}
-					buf = appendBytes(buf, nestedData)
+		{{end}}
+		
 
-				{{else if not .IsBasicType}}
+				{{if not .IsBasicType}}
 					cc := (s.{{.Name}})
 					_ = cc
 				{{end}}
+			{{if .IsCustomEncoder }}
+					// {{.Name}} ({{.BinaryTag}}) - custom encoder
+					// IsCustomEncoder: {{.IsCustomEncoder}}
+					// ElementType: {{.ElementType}}
+					// PointerToSlice: {{.IsPointerSlice}}
+					{{if or .IsSlice .IsPointerSlice}}
+					if len({{.PointerDeref}}(s.{{.Name}})) > MaxSliceLen {
+						return nil, fmt.Errorf("{{.Name}} slice too long: %d elements, max %d", len({{.PointerDeref}}(s.{{.Name}})), MaxSliceLen)
+					}
+					buf = appendUint16(buf, uint16(len({{.PointerDeref}}(s.{{.Name}}))))
 
-			{{if and .IsBasicType (not  .IsSlice) }}
+						for _, item := range {{.PointerDeref}}(s.{{.Name}}) {
+							data, err := {{.CustomEncoder}}.MarshalBinary(item)
+							if err != nil {
+								return nil, fmt.Errorf("failed to marshal item in slice {{.Name}}: %v", err)
+							}
+							buf = appendBytes(buf, data)
+						}
+					{{else}}
+						data, err := {{.CustomEncoder}}.MarshalBinary({{.PointerDeref}}(s.{{.Name}}))
+						if err != nil {
+							return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
+						}
+						buf = appendBytes(buf, data)
+					{{end}}
+			
+			{{else if and .IsBasicType (not  .IsSlice) }}
 				// {{.Name}} ({{.BinaryTag}}) - {{.Type}}
 				// IsBasicType {{ .IsBasicType }}
 				// ElementType {{ .ElementType }}
+
 				cc := {{.Type}}(s.{{.Name}})
 				_ = cc
 				{{if eq .ElementType "string"}}
@@ -822,13 +863,6 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 
 			{{else if and .IsPointer (not .IsPointerSlice) }}
 				// {{.Name}} ({{.BinaryTag}}) - pointer
-				
-				if s.{{.Name}} == nil {
-					buf = append(buf, 0) // nil marker
-					goto SKIP{{.Name}}
-				} else {
-					buf = append(buf, 1) // non-nil marker
-
 					{{if eq .ElementType "bool"}}
 					if *s.{{.Name}} {
 						buf = append(buf, 1)
@@ -885,24 +919,13 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					}
 					buf = appendBytes(buf, data)
 					{{end}}
-				}
-				{{if .IsPointer}}
-					SKIP{{.Name}}:
-				{{end}}
+				
+				
 			{{else if or .IsSlice (.IsPointerSlice) }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.ElementType}}
 				// Type: {{ .Type }}
 
-				
-				{{ if .IsPointerSlice}}
-					if s.{{.Name}} == nil {
-						buf = append(buf, 0) // nil marker
-						goto SKIP{{.Name}}
-					} else {
-						buf = append(buf, 1) // nil marker
-					}
-				{{end}}
 				{
 				mm := ({{ .PointerDeref }}(s.{{.Name}}))
 			
@@ -979,9 +1002,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 						}
 				{{end}}
 				}
-				{{if .IsPointerSlice}}
-					SKIP{{.Name}}:
-				{{end}}
+	
 			{{else}}
 				// {{.Name}} ({{.BinaryTag}}) - custom type
 				data, err := marshalValue(s.{{.Name}})
@@ -990,7 +1011,11 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 				}
 				buf = appendBytes(buf, data)
 			{{end}}
+			
 			}
+			{{if .IsPointer}}
+					SKIP{{.Name}}:
+				{{end}}
 		{{end}}
 	{{end}}
 
@@ -1028,17 +1053,52 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 		 {
         // {{.Name}} ({{.BinaryTag}})
 		// Type - {{.Type}}
+		// IsPointer - {{.IsPointer}}
 		 // ElementType - {{.ElementType}}
 		
 		{{if .IsCustomEncoder }}
-		   var nestedData []byte
-            nestedData, offset, err = getBytes(data, offset)
-            if err != nil {
-                return fmt.Errorf("failed to get bytes for nested struct {{.Name}}: %v", err)
-            }
-            if err := {{.CustomEncoder}}.UnmarshalBinary(nestedData, s.{{.Name}}); err != nil {
-                return fmt.Errorf("failed to unmarshal nested struct {{.Name}}: %v", err)
-            }
+			// Custom encoder
+			// IsCustomEncoder: {{.IsCustomEncoder}}
+			// ElementType: {{.ElementType}}
+			// PointerToSlice: {{.IsPointerSlice}}
+			
+			{{if or .IsSlice .IsPointerSlice}}
+				var length uint16
+				if offset+2 > len(data) {
+					return fmt.Errorf("buffer too short for {{.Name}} length")
+				}
+				length = binary.LittleEndian.Uint16(data[offset : offset+2])
+				offset += 2
+				p := make([]{{.CustomElementTypeName}}, length)
+				
+				for i := 0; i < int(length); i++ {
+					var itemData []byte
+					itemData, offset, err = getBytes(data, offset)
+					if err != nil {
+						return fmt.Errorf("failed to get bytes for custom encoder slice {{.Name}}[%d]: %v", i, err)
+					}
+					if _v, err := {{.CustomEncoder}}.UnmarshalBinary(itemData); err != nil {
+						return fmt.Errorf("failed to unmarshal custom encoder slice {{.Name}}[%d]: %v", i, err)
+					} else {
+						p[i] = _v.({{.CustomElementTypeName}})
+					}
+				}
+					
+					s.{{.Name}} = {{.PointerRef}}p
+			{{else}}
+				var itemData []byte
+				itemData, offset, err = getBytes(data, offset)
+				if err != nil {	
+					return fmt.Errorf("failed to get bytes for custom encoder {{.Name}}: %v", err)	
+				}
+				b, err := {{.CustomEncoder}}.UnmarshalBinary(itemData)
+				if err != nil {
+					return fmt.Errorf("failed to unmarshal custom encoder {{.Name}}: %v", err)
+				}
+					p := b.({{.CustomElementTypeName}})
+					s.{{.Name}} = {{.PointerRef}}p
+			{{end}}
+
 
         {{else if or .IsBasicType (.IsBasicPointerType) }}
 
@@ -1443,14 +1503,34 @@ func (s *{{.Name}}) BinarySize() int {
 			{{end}}
 
 		{
+		// {{.Name}} ({{.BinaryTag}})
+		// Type: {{.Type}}
+		// IsPointer: {{.IsPointer}}
+		// ElementType: {{.ElementType}}
+
 
 		{{if .IsCustomEncoder }}
-		  
-            if len, err := {{.CustomEncoder}}.BinarySize(s.{{.Name}}); err != nil {
-                return 0
-            } else {
-			   size += 2 + len
+			{{if or .IsSlice .IsPointerSlice}}
+			j := ({{.PointerDeref}}s.{{.Name}})
+			_ = j
+			size += 2 // length prefix
+			for i := range j {
+				s, err := {{.CustomEncoder}}.BinarySize(j[i])
+				if err != nil {
+					panic(fmt.Sprintf("failed to calculate binary size for custom encoder {{.Name}}[%d]: %v", i, err))
+				}
+				size += 2 + s
 			}
+			{{else}}
+			s, err := {{.CustomEncoder}}.BinarySize({{.PointerDeref}}s.{{.Name}})
+				if err != nil {
+					panic(fmt.Sprintf("failed to calculate binary size for custom encoder {{.Name}}: %v", err))
+				}
+				size += 2 + s
+			{{end}}
+		
+		  
+           
 
 		{{else if  .IsBasicType }}
 			{{if eq .Type "string"}}
