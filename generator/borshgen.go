@@ -92,6 +92,7 @@ type FieldInfo struct {
 	SliceItem             int  // index of item if Type is Slice
 	ActualType            string
 	ResolvedType          *ResolvedTypeInfo `json:"resolved_type,omitempty"`
+	FullTypeName          string
 }
 
 type StructInfo struct {
@@ -471,94 +472,82 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			}
 			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, options)
 
-			// if resolvedTypeInfo != nil {
+			if !fieldInfo.IsCustomEncoder && len(actualType) > 0 {
 
-			// 	if resolvedTypeInfo.ElementType != nil && resolvedTypeInfo.ElementType.TypeName != "" {
-			// 		fieldInfo.ElementType = (resolvedTypeInfo.ElementType.TypeName)[strings.LastIndex(resolvedTypeInfo.ElementType.TypeName, ".")+1:]
+				fieldInfo.ActualType = actualType
+				if strings.Contains(fieldInfo.Type, ".") && len(fieldInfo.KnownImportedType()) == 0 {
+					fieldInfo.CustomTypeName = fieldInfo.Type
+					fieldInfo.Type = actualType
+					if isBasicType(actualType) {
+						fieldInfo.IsBasicType = true
+						fieldInfo.ElementType = actualType
+						if fieldInfo.IsPointer {
+							fieldInfo.IsBasicPointerType = true
+						}
+					}
+				}
+				//fieldInfo.Type = actualType
+				// if len(fieldInfo.CustomTypeName) == 0 {
+				// 	fieldInfo.CustomTypeName = fieldInfo.Type
+				// }
+				// if isBasicType(actualType) {
+				// 	fieldInfo.IsBasicType = true
+				// 	if fieldInfo.IsPointer {
+				// 		fieldInfo.IsBasicPointerType = true
+				// 	}
+				// }
 
-			// 	}
-			// 	if resolvedTypeInfo.UnderlyingType != nil {
-			// 		// fmt.Println("nRESOVEDTYPE: ",  resolvedTypeInfo.UnderlyingType.String())
-			// if fieldInfo.IsSlice || fieldInfo.IsBasicPointerType {
-			// 	str :=  resolvedTypeInfo.UnderlyingType.String()
-			// 	fieldInfo.CustomElementTypeName = strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
-			// }
+			}
+			if fieldInfo.Name == "EventType" {
+				fmt.Printf("\nEVENTTYPE: %+v", fieldInfo)
+				fmt.Printf("\nFIELDDDDD: %+v", field.Type)
 
-			// 		fieldInfo.CustomTypeName = fieldInfo.Type
+			}
 
-			// 		if !fieldInfo.IsBasicType {
-			// 			fieldInfo.IsBasicType = isBasicType(resolvedTypeInfo.UnderlyingType.String())
-			// 		}
-
-			// 		fieldInfo.ActualType = resolvedTypeInfo.UnderlyingType.String()
-			// 		fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
-			// 	}
-
-			// }
-			// fmt.Println("nTYPPPPE: ", fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName, fieldInfo.CustomElementTypeName)
-
-			// Enhance field info with resolved type information
 			specialTypes := map[string]bool{
 				"time.Time":                   true,
 				"json.RawMessage":             true,
 				"github.com/google/uuid.UUID": true,
 			}
-			fmt.Println("TYPESSSS", fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName, fieldInfo.CustomElementTypeName, fieldInfo.IsBasicType, fieldInfo.IsSlice, fieldInfo.IsPointer, fieldInfo.IsMap, fieldInfo.IsInterface)
-			if resolvedTypeInfo != nil && !fieldInfo.IsBasicType && !specialTypes[fieldInfo.CustomTypeName] {
-				if fieldInfo.Name == "StateHashes" {
-					fmt.Printf("\nSTATEHSAHS %+v", resolvedTypeInfo.ElementType.ElementType)
-				}
-				fieldInfo.ResolvedType = resolvedTypeInfo
-				if len(resolvedTypeInfo.FullTypeName) > 0 {
-					if resolvedTypeInfo.ElementType != nil {
-						// fmt.Printf("\nXXXXType: %s; ElementType: %s; %+v", resolvedTypeInfo.TypeName,  resolvedTypeInfo.ElementType.TypeName, resolvedTypeInfo.UnderlyingType)
-						if len(fieldInfo.CustomTypeName) == 0 {
-							fieldInfo.CustomTypeName = resolvedTypeInfo.TypeName
-						}
-						fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
-						if len(resolvedTypeInfo.ElementType.TypeName)	> 0 {
-							fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
-						}
-					}
-					if isBasicType(fieldInfo.CustomTypeName) {
-						fieldInfo.CustomTypeName = ""
-					}
-					pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
-					ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
-					cg.mu.Lock()
-					if pkg != cg.rootPackage && !specialTypes[ctype] {
-						fmt.Printf("FULLTYPENAME: %s", pkg)
-						if !slices.ContainsFunc(cg.packages, func(p Package) bool {
-							return strings.EqualFold(p.Package, pkg)
-						}) {
-							cg.packages = append(cg.packages, Package{
-								Package:    pkg,
-								CustomType: ctype,
-							})
-						}
-					}
-					cg.mu.Unlock()
-				}
-				// if len(resolvedTypeInfo.UnderlyingType.String()) > 0 {
-				// //fmt.Println("nTYPPPPE2: ", resolvedTypeInfo.TypeName)
-				// 	fieldInfo.ElementType = strings.ReplaceAll(resolvedTypeInfo.UnderlyingType.String(), "*", "")
 
-				// 	str := fieldInfo.ActualType
-				// 	fmt.Printf("\nPackageName::: %s - %s", options.PackageName, str)
-				// 	fieldInfo.CustomTypeName = strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
-				// }
-				// if len(resolvedTypeInfo.TypeName) > 0 {
-				// // fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
-				// 		if resolvedTypeInfo.UnderlyingType.Underlying() != nil {
-				// 			str := resolvedTypeInfo.UnderlyingType.Underlying().String()
-				// 			//fieldInfo.ElementType = resolvedTypeInfo.UnderlyingType.Underlying().String()
-				// 			if len(str) > 0 {
-				// 				fieldInfo.CustomElementTypeName = resolvedTypeInfo.TypeName // strings.Replace(str[strings.LastIndex(str, "/")+1:], options.PackageName+".", "", 1 )
-				// 				fieldInfo.Type = fieldInfo.CustomElementTypeName
-				// 			}
-				// 	}
-				// }
+			if resolvedTypeInfo != nil &&  len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
+				pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
+				fmt.Printf("\nPackageName::: %s", resolvedTypeInfo.FullTypeName)
+				ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
+				cg.mu.Lock()
 
+				if pkg != cg.rootPackage && !specialTypes[ctype] {
+					if !slices.ContainsFunc(cg.packages, func(p Package) bool {
+						return strings.EqualFold(p.Package, pkg)
+					}) {
+						cg.packages = append(cg.packages, Package{
+							Package:    pkg,
+							CustomType: ctype,
+						})
+					}
+				}
+				cg.mu.Unlock()
+				if !fieldInfo.IsBasicType {
+					fieldInfo.ResolvedType = resolvedTypeInfo
+					if len(resolvedTypeInfo.FullTypeName) > 0 {
+						fieldInfo.FullTypeName = resolvedTypeInfo.FullTypeName
+						if resolvedTypeInfo.ElementType != nil {
+							// fmt.Printf("\nXXXXType: %s; ElementType: %s; %+v", resolvedTypeInfo.TypeName,  resolvedTypeInfo.ElementType.TypeName, resolvedTypeInfo.UnderlyingType)
+							if len(fieldInfo.CustomTypeName) == 0 {
+								fieldInfo.CustomTypeName = resolvedTypeInfo.TypeName
+							}
+							fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
+							if len(resolvedTypeInfo.ElementType.TypeName) > 0 {
+								fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
+							}
+						}
+						if isBasicType(fieldInfo.CustomTypeName) {
+							fieldInfo.CustomTypeName = ""
+						}
+
+					}
+
+				}
 			}
 
 			if !fieldInfo.ShouldIgnore {
@@ -678,7 +667,7 @@ func (fi *FieldInfo) GetMarshalCode(varName string) (string, bool) {
 
 // Helper method to get the marshal code for known types
 func (fieldInfo *FieldInfo) assignCustomEncoder(_fieldType string, prefix string) error {
-	
+
 	fmt.Println("ASSIGNCUSTOMENCODER", prefix, _fieldType, fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName)
 	switch _fieldType {
 	case "time.Time":
@@ -826,29 +815,28 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 					fieldInfo.ActualType = fieldInfo.Type
 					fieldInfo.IsCustomType = true
 					actualType = fieldInfo.Type
-					
 
 					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
 						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 					}
-					
+
 				}
 			}
 		}
 		if t, ok := t.X.(*ast.SelectorExpr); ok {
-				if pkgIdent, ok := t.X.(*ast.Ident); ok {
+			if pkgIdent, ok := t.X.(*ast.Ident); ok {
 
-					name := pkgIdent.Name + "." + t.Sel.Name
-					fieldInfo.Type = "*" + name
-					fieldInfo.ActualType = fieldInfo.Type
-					fieldInfo.IsCustomType = true
-					actualType = fieldInfo.Type
+				name := pkgIdent.Name + "." + t.Sel.Name
+				fieldInfo.Type = "*" + name
+				fieldInfo.ActualType = fieldInfo.Type
+				fieldInfo.IsCustomType = true
+				actualType = fieldInfo.Type
 
-					if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
-						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-					}
+				if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
+					fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 				}
 			}
+		}
 
 	case *ast.ArrayType:
 
@@ -896,21 +884,18 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 						fieldInfo.CustomTypeName = "[]*" + ident.Name + "." + t.Sel.Name
 						fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
 
+						name := ident.Name + "." + t.Sel.Name
+						fieldInfo.Type = "[]*" + name
+						fieldInfo.ActualType = fieldInfo.Type
+						fieldInfo.IsCustomType = true
+						actualType = fieldInfo.Type
 
-
-							name := ident.Name + "." + t.Sel.Name
-							fieldInfo.Type = "[]*" + name
-							fieldInfo.ActualType = fieldInfo.Type
-							fieldInfo.IsCustomType = true
-							actualType = fieldInfo.Type
-
-							if err := (&fieldInfo).assignCustomEncoder(name, "[]*"); err != nil {
-								fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-							}
-						
+						if err := (&fieldInfo).assignCustomEncoder(name, "[]*"); err != nil {
+							fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+						}
 
 					}
-			}
+				}
 
 			}
 			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
@@ -918,18 +903,15 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 					fieldInfo.CustomTypeName = "[]" + ident.Name + "." + t.Sel.Name
 					fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
 
+					name := ident.Name + "." + t.Sel.Name
+					fieldInfo.Type = "*" + name
+					fieldInfo.ActualType = fieldInfo.Type
+					fieldInfo.IsCustomType = true
+					actualType = fieldInfo.Type
 
-
-						name := ident.Name + "." + t.Sel.Name
-						fieldInfo.Type = "*" + name
-						fieldInfo.ActualType = fieldInfo.Type
-						fieldInfo.IsCustomType = true
-						actualType = fieldInfo.Type
-
-						if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
-							fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-						}
-					
+					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
+						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+					}
 
 				}
 			}
@@ -967,7 +949,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 			fieldInfo.ActualType = fieldInfo.Type
 			fieldInfo.IsCustomType = true
 			actualType = fieldInfo.Type
-
+			fmt.Printf("\nCustomEncoderFor: %s - %+v", fieldInfo.Type, fieldInfo)
 			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
 				fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 			}
@@ -978,7 +960,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 		fieldInfo.IsCustomType = true
 		actualType = customEncoder
 	}
-	if !fieldInfo.IsCustomEncoder &&  len(actualType) > 0 && actualType != fieldInfo.Type {
+	if !fieldInfo.IsCustomEncoder && len(actualType) > 0 && actualType != fieldInfo.Type {
 		fieldInfo.CustomTypeName = fieldInfo.Type
 		if !fieldInfo.IsSlice {
 			fieldInfo.Type = actualType
@@ -1073,12 +1055,11 @@ func (cg *CodeGenerator) generateCode(outputFile string) (err error) {
 		return fmt.Errorf("failed to execute helper template: %v", err)
 	}
 
-
 	// copy the custom encoder file
 	encoderFile := filepath.Join(dir, "borshgen_custom_encoder_"+fmt.Sprint(xxhash.Sum64String(filepath.Base(dir))%10000000000)+"_gen.go")
 	str := string(customEncodersBytes)
 	ce := strings.Replace(str, "package generator", "package "+cg.structs[0].Package, 1)
-	ce = "// Code generated by bingen. DO NOT EDIT."	 + "\n" + ce
+	ce = "// Code generated by bingen. DO NOT EDIT." + "\n" + ce
 	err = os.WriteFile(encoderFile, []byte(ce), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to copy custom encoders: %v", err)

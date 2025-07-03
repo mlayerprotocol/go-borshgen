@@ -324,41 +324,26 @@ func (s *{{.Name}}) Encode() ([]byte, error) {
 			{{else if eq .Type "[]byte"}}
 				result = append(result, vv...)
 
-			{{else if eq .Type "uint64"}}
-				result = appendUint64(result, vv)
-
-			{{else if eq .Type "int64"}}
+	
+			{{else if or (eq .Type "int64") (eq .Type "int") (eq .Type "uint64") }}
 				result = appendUint64(result, uint64(vv))
 
 			{{else if eq .Type "float64"}}
 				result = appendUint64(result, math.Float64bits(vv))
 
-			{{else if eq .Type "uint32"}}
-				result = appendUint32(result, vv)
-
-			{{else if eq .Type "int32"}}
-				result = appendUint32(result, uint32(vv))
-
-			{{else if eq .Type "rune"}}
+			{{else if or (eq .Type "int32") (eq .Type "uint32") (eq .Type "rune")}}
 				result = appendUint32(result, uint32(vv))
 
 			{{else if eq .Type "float32"}}
 				result = appendUint32(result, math.Float32bits(vv))
 
-			{{else if eq .Type "int"}}
-				result = appendUint32(result, uint32(vv))
 
-			{{else if eq .Type "uint16"}}
-				result = appendUint16(result, vv)
-
-			{{else if eq .Type "int16"}}
+			{{else if or (eq .Type "uint16") (eq .Type "int16")}}
 				result = appendUint16(result, uint16(vv))
 
-			{{else if or (eq .Type "uint8") (eq .Type "byte")}}
-				result = append(result, vv)
+			{{else if or (eq .Type "uint8") (eq .Type "int8") (eq .Type "byte")}}
+				result = append(result, uint8(vv))
 
-			{{else if eq .Type "int8"}}
-				result = append(result, byte(vv))
 
 			{{else if eq .Type "bool"}}
 				if s.{{.Name}} {
@@ -393,19 +378,19 @@ func (s *{{.Name}}) Encode() ([]byte, error) {
 				result = append(result, []byte(*s.{{.Name}})...)
 
 			{{else if eq .ElementType "[]byte"}}
-				result = append(result, *s.{{.Name}}...)
+				result = append(result, []byte(*s.{{.Name}}...))
 
 			{{else if eq .ElementType "uint64"}}
-				result = appendUint64(result, *s.{{.Name}})
+				result = appendUint64(result, uint64(*s.{{.Name}}))
 
 			{{else if eq .ElementType "uint32"}}
-				result = appendUint32(result, *s.{{.Name}})
+				result = appendUint32(result, uint32(*s.{{.Name}}))
 
 			{{else if eq .ElementType "uint16"}}
-				result = appendUint16(result, *s.{{.Name}})
+				result = appendUint16(result, uint16(*s.{{.Name}}))
 
 			{{else if eq .ElementType "uint8"}}
-				result = append(result, *s.{{.Name}})
+				result = append(result,uint8(*s.{{.Name}}))
 
 			{{else if eq .ElementType "int64"}}
 				result = appendUint64(result, uint64(*s.{{.Name}}))
@@ -420,7 +405,7 @@ func (s *{{.Name}}) Encode() ([]byte, error) {
 				result = append(result, byte(*s.{{.Name}}))
 
 			{{else if eq .ElementType "int"}}
-				result = appendUint32(result, uint32(*s.{{.Name}}))
+				result = appendUint64(result, uint64(*s.{{.Name}}))
 
 			{{else if eq .ElementType "float32"}}
 				result = appendUint32(result, math.Float32bits(*s.{{.Name}}))

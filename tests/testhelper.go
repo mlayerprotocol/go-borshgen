@@ -1,6 +1,10 @@
 package tests
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/mlayerprotocol/go-borshgen/tests/constants"
+)
 
 type ID int64
 type System string
@@ -15,6 +19,7 @@ type EventPath struct {
 type Event struct {
 	// Basic types
 	ID        ID `msg:"id" enc:""`
+	EventType constants.EventType `msg:"type" enc:""`
 	Parent    *[]ID   `msg:"parent,[]int64" enc:"f"`
 	Timestamp uint64  `msg:"ts" enc:""`
 	Data      []byte  `msg:"data"`
