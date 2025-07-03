@@ -47,7 +47,7 @@ Borsh                 | Go           |  Description
 `i16` integer         | `int16`       |
 `i32` integer         | `int32`       |
 `i64` integer         | `int64`       |
-`i128` integer        |            |  Not supported yet
+`i128` integer        |            |  **Not supported yet***
 `f32` float           | `float32`      |
 `f64` float           | `float64`      |
 fixed-size array      | `[size]type`   |  **Not supported yet**
@@ -58,3 +58,8 @@ map                   |   `map`          |
 set                   |   `map[type]struct{}`  | **Not supported yet**
 structs               |   `struct`      |
 enum                  |   `borsh.Enum`  |    **Not supported yet**
+
+## Additional Types
+Go                 | Borsh           |  Description
+--------------------- | -------------- |--------
+`json.RawMessage` []byte		      | `dynamic-size byte array`	       |
