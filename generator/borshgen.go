@@ -115,6 +115,11 @@ type CodeGenerator struct {
 	mu          sync.Mutex
 }
 
+	var specialTypes = map[string]bool{
+				"time.Time":                   true,
+				"json.RawMessage":             true,
+				"github.com/google/uuid.UUID": true,
+			}
 // Template helper functions
 var templateFuncs = template.FuncMap{
 	"sortedEncFields": func(fields []FieldInfo) []FieldInfo {
@@ -141,6 +146,9 @@ var templateFuncs = template.FuncMap{
 	},
 	"unmarshalBasicTypeTemplate": func(field FieldInfo) string {
 		return UnmarshalBasicTypeFieldTemplate(field)
+	},
+	"isBasicElementType": func(field FieldInfo) bool {
+		return isBasicType(field.ElementType)
 	},
 }
 
@@ -486,29 +494,22 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 						}
 					}
 				}
-				//fieldInfo.Type = actualType
-				// if len(fieldInfo.CustomTypeName) == 0 {
-				// 	fieldInfo.CustomTypeName = fieldInfo.Type
-				// }
-				// if isBasicType(actualType) {
-				// 	fieldInfo.IsBasicType = true
-				// 	if fieldInfo.IsPointer {
-				// 		fieldInfo.IsBasicPointerType = true
-				// 	}
-				// }
+				
 
 			}
-			if fieldInfo.Name == "EventType" {
-				fmt.Printf("\nEVENTTYPE: %+v", fieldInfo)
-				fmt.Printf("\nFIELDDDDD: %+v", field.Type)
-
+			if fieldInfo.IsPointer && fieldInfo.ElementType == "" {
+				// If it's a pointer but no element type is set, use the actual type
+			
+				fieldInfo.PointerDeref = "*"
+				fieldInfo.PointerRef = "&"
+				if resolvedTypeInfo.ElementType != nil {
+					fieldInfo.ElementType = resolvedTypeInfo.ElementType.UnderlyingType.String()
+				} 
+				
 			}
+			
 
-			specialTypes := map[string]bool{
-				"time.Time":                   true,
-				"json.RawMessage":             true,
-				"github.com/google/uuid.UUID": true,
-			}
+		
 
 			if resolvedTypeInfo != nil && len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
 				pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
@@ -551,8 +552,6 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 
 					}
 
-				} else {
-					fmt.Printf("\nPackageName:::%s==== %s ==== %s", fieldInfo.Name, resolvedTypeInfo.FullTypeName, fieldInfo.ElementType)
 				}
 			}
 
@@ -809,7 +808,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 						fieldInfo.IsStruct = true
 					}
 
-					fmt.Println("CustomeElementName", fieldInfo.Name, fieldInfo.CustomElementTypeName)
+				
 
 				}
 			}
@@ -823,7 +822,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 					actualType = fieldInfo.Type
 
 					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
-						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+						//fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 					}
 
 				}
@@ -839,7 +838,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 				actualType = fieldInfo.Type
 
 				if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
-					fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+				//	fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 				}
 			}
 		}
@@ -916,7 +915,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 					actualType = fieldInfo.Type
 
 					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
-						fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+						// fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 					}
 
 				}
@@ -957,7 +956,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 			actualType = fieldInfo.Type
 
 			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
-				fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+				// fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 			}
 
 		}

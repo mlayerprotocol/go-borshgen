@@ -1110,7 +1110,7 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
                 offset++
             } else {
                 offset++
-                {{if .IsBasicType }}
+                {{if isBasicElementType .  }}
 					{{ unmarshalBasicTypeTemplate . }}
                 {{else if .IsStruct}}
 					var nestedData []byte
@@ -1187,7 +1187,7 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 					if offset+2 > len(data) {
 						return fmt.Errorf("buffer too short for {{.Name}}[%d] 2-byte value", i)
 					}
-					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint16(data[offset:]))
+					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint16(data[offset:offset+2]))
 					offset += 2
 				}
 				(s.{{.Name}}) = {{.PointerRef}}tmp
@@ -1198,18 +1198,18 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 					if offset+4 > len(data) {
 						return fmt.Errorf("buffer too short for {{.Name}}[%d] 4-byte value", i)
 					}
-					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint32(data[offset:]))
+					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint32(data[offset:offset+4]))
 					offset += 4
 				}
 				((s.{{.Name}})) = {{.PointerRef}}tmp
 
-			{{else if or (eq .ElementType "int64") (eq .ElementType "uint64")}}
+			{{else if or (eq .ElementType "int64") (eq .ElementType "uint64")  (eq .ElementType "int") (eq .ElementType "uint")}}
 				tmp := make([]{{.CustomElementTypeName}}, length)
 				for i := 0; i < int(length); i++ {
 					if offset+8 > len(data) {
 						return fmt.Errorf("buffer too short for {{.Name}}[%d] 8-byte value", i)
 					}
-					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint64(data[offset:]))
+					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint64(data[offset:offset+8]))
 					offset += 8
 				}
 				(s.{{.Name}}) = {{.PointerRef}}tmp
@@ -1220,7 +1220,7 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 					if offset+4 > len(data) {
 						return fmt.Errorf("buffer too short for {{.Name}}[%d] float32", i)
 					}
-					tmp[i] = {{.CustomElementTypeName}}(math.Float32frombits(binary.LittleEndian.Uint32(data[offset:])))
+					tmp[i] = {{.CustomElementTypeName}}(math.Float32frombits(binary.LittleEndian.Uint32(data[offset:offset+4])))
 					offset += 4
 				}
 				(s.{{.Name}}) = {{.PointerRef}}tmp
@@ -1231,22 +1231,11 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 					if offset+8 > len(data) {
 						return fmt.Errorf("buffer too short for {{.Name}}[%d] float64", i)
 					}
-					tmp[i] = {{.CustomElementTypeName}}(math.Float64frombits(binary.LittleEndian.Uint64(data[offset:])))
+					tmp[i] = {{.CustomElementTypeName}}(math.Float64frombits(binary.LittleEndian.Uint64(data[offset:offset+8])))
 					offset += 8
 				}
 				(s.{{.Name}}) = {{.PointerRef}}tmp
 
-			{{else if or (eq .ElementType "int") (eq .ElementType "uint")}}
-				// Assuming platform-default 64-bit
-				tmp := make([]{{.CustomElementTypeName}}, length)
-				for i := 0; i < int(length); i++ {
-					if offset+8 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d] platform int", i)
-					}
-					tmp[i] = {{.CustomElementTypeName}}(binary.LittleEndian.Uint64(data[offset:]))
-					offset += 8
-				}
-				(s.{{.Name}}) = {{.PointerRef}}tmp
 			
 
 			{{else if .IsCustomType}}
@@ -1303,108 +1292,9 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) error {
 					val := {{.CustomElementTypeName}}(itemData)
 					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
 
-				{{else if eq .ElementType "uint64"}}
-					if offset+8 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(binary.LittleEndian.Uint64(data[offset:]))
-					offset += 8
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-
-
-				{{else if eq .ElementType "uint32"}}
-					if offset+4 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(binary.LittleEndian.Uint32(data[offset:]))
-					offset += 4
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-
-				{{else if eq .ElementType "uint16"}}
-					if offset+2 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(binary.LittleEndian.Uint16(data[offset:]))
-					offset += 2
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-
-				{{else if eq .ElementType "uint8"}}
-					if offset+1 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(data[offset])
-					offset++
-
-				{{else if eq .ElementType "int64"}}
-					if offset+8 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(int64(binary.LittleEndian.Uint64(data[offset:])))
-					offset += 8
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-			
-
-				{{else if eq .ElementType "int32"}}
-					if offset+4 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(int32(binary.LittleEndian.Uint32(data[offset:])))
-					offset += 4
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-
-				{{else if eq .ElementType "int16"}}
-					if offset+2 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(int16(binary.LittleEndian.Uint16(data[offset:])))
-					offset += 2
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-
-				{{else if eq .ElementType "int8"}}
-					if offset+1 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(int8(data[offset]))
-					offset++
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-			
-
-				{{else if eq .ElementType "int"}}
-					if offset+4 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(int(binary.LittleEndian.Uint32(data[offset:])))
-					offset += 4
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-
-				{{else if eq .ElementType "float32"}}
-					if offset+4 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(math.Float32frombits(binary.LittleEndian.Uint32(data[offset:])))
-					offset += 4
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-				{{else if eq .ElementType "float64"}}
-					if offset+8 > len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(math.Float64frombits(binary.LittleEndian.Uint64(data[offset:])))
-					offset += 8
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-				{{else if eq .ElementType "bool"}}
-					if offset >= len(data) {
-						return fmt.Errorf("buffer too short for {{.Name}}[%d]", i)
-					}
-					val := {{.CustomElementTypeName}}(data[offset] != 0)
-					offset++
-					({{.PointerDeref}}(s.{{.Name}}))[i] = {{.ElementPointerRef}}val
-				
-
+				{{else if isBasicElementType . }}
+					{{ unmarshalBasicTypeTemplate . }}
+					
 				{{else}}
 					var itemData []byte
 					itemData, offset, err = getBytes(data, offset)

@@ -18,7 +18,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	}
 	ctype = strings.ReplaceAll(ctype, "*", "")
 	t := f.Type
-	if f.IsSlice && f.ElementType != "" {
+	if (f.IsSlice || f.IsPointer) && f.ElementType != "" {
 		t = f.ElementType
 	}
 
@@ -66,7 +66,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	if offset+8 > len(data) {
 		return fmt.Errorf("buffer too short for %s")
 	}
-	val := %s(binary.LittleEndian.Uint64(data[offset:]))
+	val := %s(binary.LittleEndian.Uint64(data[offset:offset+8]))
 	offset += 8
 	s.%s = %sval
 `, name, ctype, name, prefix)
@@ -76,7 +76,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	if offset+4 > len(data) {
 		return fmt.Errorf("buffer too short for %s")
 	}
-	val := %s(binary.LittleEndian.Uint32(data[offset:]))
+	val := %s(binary.LittleEndian.Uint32(data[offset:offset+4]))
 	offset += 4
 	s.%s = %sval
 `, name, ctype, name, prefix)
@@ -86,7 +86,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	if offset+2 > len(data) {
 		return fmt.Errorf("buffer too short for %s")
 	}
-	val := %s(binary.LittleEndian.Uint16(data[offset:]))
+	val := %s(binary.LittleEndian.Uint16(data[offset:offset+2]))
 	offset += 2
 	s.%s = %sval
 `, name, ctype, name, prefix)
@@ -105,7 +105,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	if offset+4 > len(data) {
 		return fmt.Errorf("buffer too short for %s")
 	}
-	val := %s(math.Float32frombits(binary.LittleEndian.Uint32(data[offset:])))
+	val := %s(math.Float32frombits(binary.LittleEndian.Uint32(data[offset:offset+4])))
 	offset += 4
 	s.%s = %sval
 `, name, ctype, name, prefix)
@@ -115,7 +115,7 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	if offset+8 > len(data) {
 		return fmt.Errorf("buffer too short for %s")
 	}
-	val := %s(math.Float64frombits(binary.LittleEndian.Uint64(data[offset:])))
+	val := %s(math.Float64frombits(binary.LittleEndian.Uint64(data[offset:offset+8])))
 	offset += 8
 	s.%s = %sval
 `, name, ctype, name, prefix)
