@@ -509,7 +509,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			}
 			
 			if fieldInfo.Name == "DataType" {
-fmt.Println("PROCESSTYPE: ",   resolvedTypeInfo )
+fmt.Printf("\nPROCESSTYPE: %+v ",   resolvedTypeInfo )
 fmt.Println("PROCESSTYPEELEMENTTYPE: ",   resolvedTypeInfo.ElementType )
 			}		
 			if resolvedTypeInfo != nil {
