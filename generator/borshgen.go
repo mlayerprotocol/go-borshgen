@@ -507,7 +507,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 
 			}
-
+			fmt.Println("PROCESSTYPE: ", fieldInfo.Name, resolvedTypeInfo == nil )
 			if resolvedTypeInfo != nil {
 				pkg := ""
 				ctype := ""
