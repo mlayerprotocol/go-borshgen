@@ -515,17 +515,35 @@ fmt.Println("PROCESSTYPEELEMENTTYPE: ",   resolvedTypeInfo.ElementType )
 			if resolvedTypeInfo != nil {
 				pkg := ""
 				ctype := ""
+				pksString := ""
 				 if len(resolvedTypeInfo.FullTypeName) > 0 {
-					pkg = resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
-					ctype = resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
+					pksString = resolvedTypeInfo.FullTypeName
+					// pkg = resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
+					// ctype = resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
+				 } else	if resolvedTypeInfo.UnderlyingType!=nil && len(resolvedTypeInfo.UnderlyingType.String()) > 0 {
+					pksString = resolvedTypeInfo.UnderlyingType.String()
+					// pkg = resolvedTypeInfo.UnderlyingType[0:strings.LastIndex(resolvedTypeInfo.UnderlyingType, ".")]
+					// ctype = resolvedTypeInfo.UnderlyingType[strings.LastIndex(resolvedTypeInfo.UnderlyingType, "/")+1:]
 				 } else {
-					if resolvedTypeInfo.ElementType != nil && len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
-						pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
-						ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
+					if resolvedTypeInfo.ElementType != nil  {
+						if  len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
+							pksString = resolvedTypeInfo.FullTypeName
+						} else if  resolvedTypeInfo.ElementType.UnderlyingType != nil &&  len(resolvedTypeInfo.ElementType.UnderlyingType.String()) > 0 {
+									pksString = resolvedTypeInfo.UnderlyingType.String()
+						}
+						// pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
+						// ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
+					}  
 
-					} 
 				}
-				fmt.Println("FOUUND: ", resolvedTypeInfo.TypeName, resolvedTypeInfo.FullTypeName, resolvedTypeInfo.PackagePath	)
+				pksString = strings.ReplaceAll(pksString, "[]", "")
+				pksString = strings.ReplaceAll(pksString, "*", "")
+				if len(pksString) > 0  && strings.Contains(pksString, "."){
+					pkg = pksString[0:strings.LastIndex(pksString, ".")]
+					ctype = pksString[strings.LastIndex(pksString, "/")+1:]
+				}
+				
+				// fmt.Println("FOUUND: ", resolvedTypeInfo.TypeName, resolvedTypeInfo.FullTypeName, resolvedTypeInfo.PackagePath	)
 				
 				if resolvedTypeInfo.ElementType != nil {
 					fmt.Println("FOUUND: ", resolvedTypeInfo.ElementType.FullTypeName, resolvedTypeInfo.ElementType.PackagePath	)
