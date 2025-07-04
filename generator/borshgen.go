@@ -115,11 +115,12 @@ type CodeGenerator struct {
 	mu          sync.Mutex
 }
 
-	var specialTypes = map[string]bool{
-				"time.Time":                   true,
-				"json.RawMessage":             true,
-				"github.com/google/uuid.UUID": true,
-			}
+var specialTypes = map[string]bool{
+	"time.Time":                   true,
+	"json.RawMessage":             true,
+	"github.com/google/uuid.UUID": true,
+}
+
 // Template helper functions
 var templateFuncs = template.FuncMap{
 	"sortedEncFields": func(fields []FieldInfo) []FieldInfo {
@@ -494,40 +495,51 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 						}
 					}
 				}
-				
 
 			}
 			if fieldInfo.IsPointer && fieldInfo.ElementType == "" {
 				// If it's a pointer but no element type is set, use the actual type
-			
+
 				fieldInfo.PointerDeref = "*"
 				fieldInfo.PointerRef = "&"
 				if resolvedTypeInfo.ElementType != nil {
 					fieldInfo.ElementType = resolvedTypeInfo.ElementType.UnderlyingType.String()
-				} 
-				
-			}
-			
+				}
 
-		
+			}
+
+			if resolvedTypeInfo != nil {
+				pkg := ""
+				ctype := ""
+				if resolvedTypeInfo.ElementType != nil && len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
+					pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
+					ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
+
+				} else if len(resolvedTypeInfo.FullTypeName) > 0 {
+					pkg = resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
+					ctype = resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
+				}
+
+				if len(pkg) > 0 {
+					
+					cg.mu.Lock()
+
+					if pkg != cg.rootPackage && !specialTypes[ctype] {
+						if !slices.ContainsFunc(cg.packages, func(p Package) bool {
+							return strings.EqualFold(p.Package, pkg)
+						}) {
+							cg.packages = append(cg.packages, Package{
+								Package:    pkg,
+								CustomType: ctype,
+							})
+						}
+					}
+					cg.mu.Unlock()
+				}
+			}
 
 			if resolvedTypeInfo != nil && len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
-				pkg := resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
 
-				ctype := resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
-				cg.mu.Lock()
-
-				if pkg != cg.rootPackage && !specialTypes[ctype] {
-					if !slices.ContainsFunc(cg.packages, func(p Package) bool {
-						return strings.EqualFold(p.Package, pkg)
-					}) {
-						cg.packages = append(cg.packages, Package{
-							Package:    pkg,
-							CustomType: ctype,
-						})
-					}
-				}
-				cg.mu.Unlock()
 				if !fieldInfo.IsBasicType {
 
 					fieldInfo.ResolvedType = resolvedTypeInfo
@@ -808,8 +820,6 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 						fieldInfo.IsStruct = true
 					}
 
-				
-
 				}
 			}
 			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
@@ -838,7 +848,7 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 				actualType = fieldInfo.Type
 
 				if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
-				//	fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
+					//	fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
 				}
 			}
 		}
