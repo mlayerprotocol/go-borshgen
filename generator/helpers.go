@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -135,3 +137,36 @@ func UnmarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	}
 }
 
+
+
+// Helper functions for appending data
+func AppendUint16(buf []byte, v uint16) []byte {
+	return append(buf, byte(v), byte(v>>8))
+}
+
+func AppendUint32(buf []byte, v uint32) []byte {
+	return append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+}
+
+func AppendUint64(buf []byte, v uint64) []byte {
+	return append(buf,
+		byte(v), byte(v>>8), byte(v>>16), byte(v>>24),
+		byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
+}
+
+func AppendBytes(buf, data []byte) []byte {
+	buf = AppendUint16(buf, uint16(len(data)))
+	return append(buf, data...)
+}
+
+func GetBytes(data []byte, offset int) ([]byte, int, error) {
+	if offset+2 > len(data) {
+		return nil, offset, errors.New("buffer too short for length")
+	}
+	length := binary.LittleEndian.Uint16(data[offset:offset+2])
+	offset += 2
+	if offset+int(length) > len(data) {
+		return nil, offset, errors.New("buffer too short for data")
+	}
+	return data[offset:offset+int(length)], offset+int(length), nil
+}
