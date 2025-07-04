@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 
+	"github.com/mlayerprotocol/go-borshgen/tests/configs"
 	"github.com/mlayerprotocol/go-borshgen/tests/constants"
 )
 
@@ -19,8 +20,9 @@ type EventPath struct {
 type Event struct {
 	// Basic types
 	ID        ID `msg:"id" enc:""`
-	//EventType constants.EventType `msg:"type" enc:""`
-	EventTypePtr *constants.EventType `msg:"typep" enc:""`
+	EventType constants.EventType `msg:"type" enc:""`
+	Chain  configs.ChainId `msg:"typep" enc:""`
+	//EventTypePtr *constants.EventType `msg:"typep" enc:""`
 	Parent    *[]ID   `msg:"parent,[]int64" enc:"f"`
 	Timestamp uint64  `msg:"ts" enc:""`
 	Data      []byte  `msg:"data"`

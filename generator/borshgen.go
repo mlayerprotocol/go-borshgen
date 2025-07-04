@@ -511,13 +511,15 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			if resolvedTypeInfo != nil {
 				pkg := ""
 				ctype := ""
-				if resolvedTypeInfo.ElementType != nil && len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
-					pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
-					ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
-
-				} else if len(resolvedTypeInfo.FullTypeName) > 0 {
+				 if len(resolvedTypeInfo.FullTypeName) > 0 {
 					pkg = resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
 					ctype = resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
+				 } else {
+					if resolvedTypeInfo.ElementType != nil && len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
+						pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
+						ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
+
+					} 
 				}
 
 				if len(pkg) > 0 {
