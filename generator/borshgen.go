@@ -208,7 +208,7 @@ func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOption
 					options.SafeMode = false
 				} else if option == "-no-pool" {
 					options.UsePooling = false
-				} else if option == "-encode-tag=" {
+				} else if strings.HasPrefix(option,"-encode-tag=") {
 					options.EncodeTag = strings.TrimPrefix(option, "-encode-tag=")
 				}
 			}
@@ -521,6 +521,8 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 
 					} 
 				}
+				fmt.Println("FOUUND: ", resolvedTypeInfo.TypeName, resolvedTypeInfo.FullTypeName, resolvedTypeInfo.PackagePath	)
+				
 				if resolvedTypeInfo.ElementType != nil {
 					fmt.Println("FOUUND: ", resolvedTypeInfo.ElementType.FullTypeName, resolvedTypeInfo.ElementType.PackagePath	)
 				}
