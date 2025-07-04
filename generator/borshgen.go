@@ -521,6 +521,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 
 					} 
 				}
+				fmt.Println("FOUUND: ", resolvedTypeInfo.FullTypeName)
 
 				if len(pkg) > 0 {
 					
