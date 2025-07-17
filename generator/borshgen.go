@@ -31,6 +31,13 @@ import (
 //go:embed custom_encoders.go
 var customEncodersBytes []byte
 
+func printWarning(message ...any) {
+	yellow := "\033[33m"
+	reset := "\033[0m"
+
+	fmt.Println(yellow, "⚠️", message, reset)
+}
+
 type TypeShape struct {
 	Name                   string     // e.g., "int32"
 	Field                  *FieldInfo // e.g., "int32"
@@ -567,9 +574,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// Store the root of the nested structure
 				fieldInfo.Element = result
 			}
-			
-			fmt.Printf("\nEMPTYTREE: %s::%s:: %+v\n", name.Name, resolvedTypeInfo.TypeName,  resolvedTypeInfo.TypesTree)
-
+		
 			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {
 
 				fieldInfo.ActualType = actualType
@@ -1268,7 +1273,7 @@ func GenerateDir(path, primaryTag, fallbackTag, encodeTag string, ignoreTag stri
 			defer os.Remove(tmp)
 			err := Generate(p, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
 			if err != nil {
-				fmt.Printf("CodeGentError: %v", err)
+				fmt.Printf("CodeGentWarning: %v", err)
 				if !strings.Contains(err.Error(), "no structs found") {
 					return err
 				}
@@ -1303,7 +1308,7 @@ func GenerateFile(path, primaryTag, fallbackTag, encodeTag string, ignoreTag str
 	defer os.Remove(tmp)
 	err = Generate(path, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
 	if err != nil {
-		fmt.Printf("CodeGentError: %v", err)
+		printWarning("Warning: %v", err)
 		if !strings.Contains(err.Error(), "no structs found") {
 			return err
 		}
