@@ -589,14 +589,14 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				fieldInfo.Element = result
 				fieldInfo.ElementType = result.ElementType
 			} else {
-				if !fieldInfo.IsCustomFieldEncoder {
-					printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
-					panic("")
-				} else {
+				// if !fieldInfo.IsCustomFieldEncoder {
+				// 	printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+				// 	panic("")
+				// } else {
 					fieldInfo.Element = &ResolvedTypeInfo{
 						ElementType: fieldInfo.ElementType,
 					}
-				}
+				// }
 			}
 		
 			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {
