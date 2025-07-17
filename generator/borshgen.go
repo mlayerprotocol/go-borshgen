@@ -587,13 +587,14 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 				// Store the root of the nested structure
 				fieldInfo.Element = result
+				fieldInfo.ElementType = result.ElementType
 			} else {
 				if !fieldInfo.IsCustomFieldEncoder {
-				printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
-				panic("")
+					printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+					panic("")
 				} else {
 					fieldInfo.Element = &ResolvedTypeInfo{
-						
+						ElementType: fieldInfo.ElementType,
 					}
 				}
 			}

@@ -36,9 +36,10 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) (error) {
 				if _v, err := {{.CustomFieldEncoder}}.UnmarshalBinary(itemData); err != nil {
 					return fmt.Errorf("failed to unmarshal custom field encoder slice {{.Name}}]: %v", err)
 				} else {
-				 	{{ if .Element.TypeName}}
-				 		_m := (_v).({{ .Element.TypeName}})
+				 	{{ if .Element.ElementType }}
+				 		_m := (_v).({{ .Element.ElementType }})
 					{{else}}
+					
 						_m := (_v)
 					{{end}}
 					s.{{.Name}} = {{.PointerRef}}_m
@@ -52,8 +53,8 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) (error) {
 			} else {
 				// _m := (_v).({{ .Element.TypeName}})
 				// s.{{.Name}} = {{.PointerRef}}_m
-					{{ if .TypeName}}
-				 		_m := (_v).({{ .TypeName}})
+					{{ if .Element.TypeName}}
+				 		_m := (_v).({{ .Element.TypeName}})
 					{{else}}
 						_m := (_v)
 					{{end}}
