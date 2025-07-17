@@ -50,7 +50,7 @@ Borsh                 | Go           |  Description
 `i128` integer        |            |  **Not supported yet***
 `f32` float           | `float32`      |
 `f64` float           | `float64`      |
-fixed-size array      | `[size]type`   |  **Not supported yet**
+fixed-size array      | `[size]type`   |   go array
 dynamic-size array    |  `[]type`      |  go slice
 string                | `string`       |
 option                |  `*type`         |   go pointer
