@@ -28,7 +28,7 @@ import (
 	"github.com/mlayerprotocol/go-borshgen/templates"
 )
 
-//go:embed custom_encoders.go
+//go:embed default_encoders.go
 var customEncodersBytes []byte
 
 func printWarning(message ...any) {
@@ -588,8 +588,14 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// Store the root of the nested structure
 				fieldInfo.Element = result
 			} else {
+				if !fieldInfo.IsCustomFieldEncoder {
 				printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
 				panic("")
+				} else {
+					fieldInfo.Element = &ResolvedTypeInfo{
+						
+					}
+				}
 			}
 		
 			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {
