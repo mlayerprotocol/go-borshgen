@@ -952,7 +952,7 @@ func (resolvedType *ResolvedTypeInfo) assignCustomElementEncoder(_fieldType stri
 	case "[]byte":
 		resolvedType.TypeName =  "[]byte"
 		resolvedType.CustomTypeName = prefix + "[]byte"
-		resolvedType.CustomElementEncoder = "_CustomByteArrayEncoder"
+		resolvedType.CustomElementEncoder = "_DefaultByteArrayEncoder"
 		resolvedType.Element = &ResolvedTypeInfo{TypeName: "[]byte", IsBasicType: false}
 		resolvedType.IsCustomElementEncoder = true
 	case "time.Time":
@@ -966,7 +966,7 @@ func (resolvedType *ResolvedTypeInfo) assignCustomElementEncoder(_fieldType stri
 
 		resolvedType.TypeName = "json.RawMessage"
 		 resolvedType.CustomTypeName = prefix + "json.RawMessage"
-		resolvedType.CustomElementEncoder = "_CustomJsonRawMessageEncoder"
+		resolvedType.CustomElementEncoder = "_DefaultJsonRawMessageEncoder"
 		resolvedType.Element = &ResolvedTypeInfo{TypeName: "[]byte", UnderlyingType: types.NewArray(types.Typ[types.Byte], 16), IsBasicType: false, Element: &ResolvedTypeInfo{TypeName: "byte", UnderlyingType: types.Typ[types.Byte], IsBasicType: true}}
 		resolvedType.IsCustomElementEncoder = true
 	case "uuid.UUID":

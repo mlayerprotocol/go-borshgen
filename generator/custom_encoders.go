@@ -11,31 +11,31 @@ type CustomElementEncoder interface {
 	Encode(field any) ([]byte, error)
 	
 }
-var _CustomJsonRawMessageEncoder = CustomJsonRawMessageEncoder{}
-var _CustomByteArrayEncoder = CustomByteArrayEncoder{}
+var _DefaultJsonRawMessageEncoder = DefaultJsonRawMessageEncoder{}
+var _DefaultByteArrayEncoder = DefaultByteArrayEncoder{}
 
-type CustomJsonRawMessageEncoder struct {}
+type DefaultJsonRawMessageEncoder struct {}
 
-func (c CustomJsonRawMessageEncoder) MarshalBinary(field any) ([]byte, error) {
+func (c DefaultJsonRawMessageEncoder) MarshalBinary(field any) ([]byte, error) {
 	if f, ok := field.(json.RawMessage); !ok {
 		return []byte{}, fmt.Errorf("expected json.RawMessage, got %T", field)
 	} else {
 		return []byte(f), nil
 	}
 }
-func (c CustomJsonRawMessageEncoder) UnmarshalBinary(data []byte) (any, error) {
+func (c DefaultJsonRawMessageEncoder) UnmarshalBinary(data []byte) (any, error) {
 	m := json.RawMessage(data)
 	return m, nil
 }
 
-func (c CustomJsonRawMessageEncoder) BinarySize(field any) (int, error) {
+func (c DefaultJsonRawMessageEncoder) BinarySize(field any) (int, error) {
 	if f, ok := field.(json.RawMessage); !ok {
 		return 0, fmt.Errorf("expected json.RawMessage, got %T", field)
 	} else {
 		return len(f), nil
 	}
 }
-func (c CustomJsonRawMessageEncoder) Encode(field any) ([]byte, error) {
+func (c DefaultJsonRawMessageEncoder) Encode(field any) ([]byte, error) {
 	if f, ok := field.(json.RawMessage); !ok {
 		return nil, fmt.Errorf("expected json.RawMessage, got %T", field)
 	} else {
@@ -43,28 +43,28 @@ func (c CustomJsonRawMessageEncoder) Encode(field any) ([]byte, error) {
 	}
 }
 
-type CustomByteArrayEncoder struct {}
+type DefaultByteArrayEncoder struct {}
 
-func (c CustomByteArrayEncoder) MarshalBinary(field any) ([]byte, error) {
+func (c DefaultByteArrayEncoder) MarshalBinary(field any) ([]byte, error) {
 	if f, ok := field.([]byte); !ok {
 		return []byte{}, fmt.Errorf("expected []byte, got %T", field)
 	} else {
 		return f, nil
 	}
 }
-func (c CustomByteArrayEncoder) UnmarshalBinary(data []byte) (any, error) {
+func (c DefaultByteArrayEncoder) UnmarshalBinary(data []byte) (any, error) {
 	m := data
 	return m, nil
 }
 
-func (c CustomByteArrayEncoder) BinarySize(field any) (int, error) {
+func (c DefaultByteArrayEncoder) BinarySize(field any) (int, error) {
 	if f, ok := field.([]byte); !ok {
 		return 0, fmt.Errorf("expected json.RawMessage, got %T", field)
 	} else {
 		return len(f), nil
 	}
 }
-func (c CustomByteArrayEncoder) Encode(field any) ([]byte, error) {
+func (c DefaultByteArrayEncoder) Encode(field any) ([]byte, error) {
 	if f, ok := field.([]byte); !ok {
 		return nil, fmt.Errorf("expected []byte, got %T", field)
 	} else {
