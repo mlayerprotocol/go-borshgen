@@ -251,7 +251,7 @@ func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOption
 	for _, comment := range commentGroup.List {
 		line := strings.TrimSpace(comment.Text)
 
-		if strings.HasPrefix(line, "//go:generate borshgen") {
+		if strings.HasPrefix(strings.TrimSpace(line), "//go:generate borshgen") {
 
 			found = true
 

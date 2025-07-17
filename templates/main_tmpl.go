@@ -271,9 +271,10 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 	
 	{{range sortedEncFields .Fields}}
 	// Field: {{.Name}} (tag: {{.BinaryTag}})
-	// IsBasicType: {{.Element.IsBasicType}}
+	// IsBasicType: {{.IsBasicType}}
 	// CustomeFieldEncoder: {{.IsCustomFieldEncoder}}
-	// CustomeElementncoder: {{.Element.TypeName}}
+	// CustomeElementncoder: {{.TypeName}}
+	// Field: {{.}}
 	
 	{
 
