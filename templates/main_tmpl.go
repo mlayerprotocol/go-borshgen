@@ -279,7 +279,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 	{
 
 		
-		{{ if or .Element.IsPointer .Element.IsPointerSlice }}
+		{{ if or .IsPointer .IsPointerSlice }}
 			if s.{{.Name}} == nil {
 				goto SKIP{{.Name}}
 			}
@@ -299,7 +299,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}
 			buf = append(buf, data...)
-		{{ else if .Element.IsSlice  }}
+		{{ else if and .Element .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}
 				// Type: {{ .Element.TypeName }}
@@ -326,6 +326,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 					"TypeName" .TypeName
 					"IsPointer" .IsPointer
 					"PointerDeref" .PointerDeref
+					"PointerRef" .PointerRef
 					"IsCustomElementEncoder" .IsCustomElementEncoder
 					"CustomElementEncoder" .CustomElementEncoder
 					"IsStruct" .IsStruct
@@ -343,6 +344,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 					"FieldName" .Name
 					"ElementType" .Element.ElementType
 					"IsPointer" .Element.IsPointer
+					"PointerRef" .Element.PointerRef
 					"PointerDeref" .Element.PointerDeref
 					"IsCustomElementEncoder" .Element.IsCustomElementEncoder
 					"CustomElementEncoder" .Element.CustomElementEncoder

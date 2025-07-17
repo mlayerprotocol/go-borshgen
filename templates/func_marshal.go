@@ -57,7 +57,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 				return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
 			}
 			buf = appendBytes(buf, data)
-		{{ else if .Element.IsSlice  }}
+		{{ else if and .Element .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}
 				// Type: {{ .Element.TypeName }}
@@ -80,9 +80,11 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					{{template "marshalScalarElement"  dict
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
+					"TypeName" .TypeName
 					"ElementType" .ElementType
 					"IsPointer" .IsPointer
 					"PointerDeref" .PointerDeref
+					"PointerRef" .PointerRef
 					"IsCustomElementEncoder" .IsCustomElementEncoder
 					"CustomElementEncoder" .CustomElementEncoder
 					"IsStruct" .IsStruct
@@ -99,8 +101,10 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
 					"ElementType" .Element.ElementType
+					"TypeName" .Element.TypeName
 					"IsPointer" .Element.IsPointer
 					"PointerDeref" .Element.PointerDeref
+					"PointerRef" .Element.PointerRef
 					"IsCustomElementEncoder" .Element.IsCustomElementEncoder
 					"CustomElementEncoder" .Element.CustomElementEncoder
 					"IsStruct" .Element.IsStruct
