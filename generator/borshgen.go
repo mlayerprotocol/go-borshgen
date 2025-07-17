@@ -35,9 +35,14 @@ func printWarning(message ...any) {
 	yellow := "\033[33m"
 	reset := "\033[0m"
 
-	fmt.Println(yellow, "⚠️", message, reset)
+	fmt.Println(yellow, "Warning:", "⚠️", message, reset)
 }
+func printError(message ...any) {
+	red := "\033[31m"
+	reset := "\033[0m"
 
+	fmt.Println(red, "Error:", "❌", message, reset)
+}
 type TypeShape struct {
 	Name                   string     // e.g., "int32"
 	Field                  *FieldInfo // e.g., "int32"
@@ -1307,9 +1312,12 @@ func GenerateFile(path, primaryTag, fallbackTag, encodeTag string, ignoreTag str
 	defer os.Remove(tmp)
 	err = Generate(path, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
 	if err != nil {
-		printWarning("Warning: %v", err)
+	
 		if !strings.Contains(err.Error(), "no structs found") {
+			printError(err)
 			return err
+		} else {
+			printWarning(err)
 		}
 		return nil
 	}
