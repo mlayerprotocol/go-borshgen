@@ -20,20 +20,6 @@ const (
 	MaxSliceLen  = {{.Options.MaxSliceLen}}
 )
 
-type BinaryMarshaler interface {
-	MarshalBinary() ([]byte, error)
-	BinarySize() (int, error)
-}
-
-type BinaryUnMarshaler interface {
-	UnmarshalBinary(data []byte) error
-}
-
-type BinaryEncoder interface {
-	Encode() ([]byte, error)
-}
-
-
 
 {{if .Options.UsePooling}}
 // Buffer pool for encoding

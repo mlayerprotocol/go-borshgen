@@ -4,6 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 )
+
+type BinaryMarshaler interface {
+	MarshalBinary() ([]byte, error)
+	BinarySize() (int, error)
+}
+
+type BinaryUnMarshaler interface {
+	UnmarshalBinary(data []byte) error
+}
+
+type BorshEncoder interface {
+	Encode() ([]byte, error)
+	BinaryMarshaler
+	BinaryUnMarshaler
+}
+
+
 type CustomElementEncoder interface {
 	MarshalBinary(field any) ([]byte, error)
 	UnmarshalBinary(data []byte) (any, error)

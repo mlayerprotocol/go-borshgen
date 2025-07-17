@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+
+
 func MarshalBasicTypeFieldTemplate(f FieldInfo) string {
 	name := f.Name
 	
