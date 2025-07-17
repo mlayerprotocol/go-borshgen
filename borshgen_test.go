@@ -8,13 +8,11 @@ import (
 	"github.com/mlayerprotocol/go-borshgen/generator"
 )
                     
-
  func TestGenerator(t *testing.T) {
-
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		panic("could not get caller in            fo")
-	}
+		panic("could not get caller info")
+	}          
 	// return filepath.Dir(filename)
 	dir :=  filepath.Dir(filename)
 	//	tmpFile, err := f, err := os.Create(fileName)
@@ -28,5 +26,5 @@ import (
 		if err != nil {
 			t.Log("Successfully Generate files")
 		}
-		// t.Error(err)
+		 t.Error(err)
  }

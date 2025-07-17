@@ -22,11 +22,18 @@ const (
 
 type BinaryMarshaler interface {
 	MarshalBinary() ([]byte, error)
+	BinarySize() (int, error)
 }
 
 type BinaryUnMarshaler interface {
 	UnmarshalBinary(data []byte) error
 }
+
+type BinaryEncoder interface {
+	Encode() ([]byte, error)
+}
+
+
 
 {{if .Options.UsePooling}}
 // Buffer pool for encoding
@@ -77,6 +84,15 @@ func getBytes(data []byte, offset int) ([]byte, int, error) {
 	return data[offset:offset+int(length)], offset+int(length), nil
 }
 
+func getFixedBytes(data []byte, offset, length int) ([]byte, int, error) {
+	if offset+length > len(data) {
+		return nil, offset, errors.New("buffer too short for length")
+	}
+	
+	
+	return data[offset:offset+length], offset+int(length), nil
+}
+
 func marshalValue(v interface{}) ([]byte, error) {
 	if bm, ok := v.(BinaryMarshaler); ok {
 		return bm.MarshalBinary()
@@ -89,6 +105,21 @@ func unmarshalValue(data []byte, v interface{}) error {
 		return bu.UnmarshalBinary(data)
 	}
 	return fmt.Errorf("unsupported type for unmarshaling: %T", v)
+}
+
+func encodeValue(v interface{}) ([]byte, error) {
+	if be, ok := v.(BinaryEncoder); ok {
+		return be.Encode()
+	}
+	return nil, fmt.Errorf("unsupported type for encoding: %T", v)
+}
+
+
+func binarySize(v interface{}) (int, error) {
+	if be, ok := v.(BinaryMarshaler); ok {
+		return be.BinarySize()
+	}
+	return 0, fmt.Errorf("unsupported type for binary size: %T", v)
 }
 
 `

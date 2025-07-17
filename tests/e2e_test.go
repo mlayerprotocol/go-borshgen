@@ -6,34 +6,53 @@ import (
 	"math"
 	"reflect"
 	"testing"
-)
 
+	"github.com/mlayerprotocol/go-borshgen/tests/configs"
+)
+      
 
 func TestBinaryEncoding(t *testing.T) {
 	// Create test data with various data types
 	testID := ID(32232)
-	parentIDs := []ID{100, 200, 300}
-	optionalCounter := int32(42)
+	 parentIDs := []ID{100, 200, 300}
+	 optionalCounter := int32(42)
 	optionalFlag := true
 	optionalScore := 99.5
-	rawMessage := json.RawMessage(`{"key": "value"}`)
+	 rawMessage := json.RawMessage(`{"key": "value"}`)
+	b1 := [32]byte{
+		1, 2, 3, 4, 5, 6, 7, 8,
+		9, 10, 11, 12, 13, 14, 15, 16,
+		17, 18, 19, 20, 21, 22, 23, 24,
+		25, 26, 27, 28, 29, 30, 31, 32,
+	}
+	b2 := [32]byte{
+		21, 22, 23, 24, 5, 6, 7, 8,
+		9, 10, 111, 212, 13, 14, 15, 16,
+		17, 38, 19, 210, 1, 2, 23, 24,
+		5, 4, 4, 1, 29, 10, 31, 32,
+	}
+	chainId1 := configs.ChainId("c1")
+	chainId2 := configs.ChainId("c2")
+	// chainId3 := configs.ChainId("c3")
 	
 	original := Event{
 		ID:        testID,
-		Parent:    &parentIDs,
+		 Parent:    &parentIDs,
+		FixedSlice: [][32]byte{b1, b2 },
 		Timestamp: math.MaxInt64,
-		Data:      []byte("test data content"),
-		Counter:   -123,
-		Flag:      true,
+		Path: &EventPath{
+			ID:        456,
+			Timestamp: 9876543210,
+		},
+		 Data:      []byte("test data content"),
+		 Counter:   -123,
+		 Flag:      true,
 		Score:     3.14159,
 		Rating                                          :    2.5,
 		Systems:   []System{"auth", "logging", "metrics"},
 		Tags:      []string{"urgent", "production", "critical"},
 	
-		Path: EventPath{
-			ID:        456,
-			Timestamp: 9876543210,
-		},
+		
 		Paths: []EventPath{
 			{ID: 111, Timestamp: 1111},
 			{ID: 222, Timestamp: 2222},
@@ -47,7 +66,7 @@ func TestBinaryEncoding(t *testing.T) {
 		OptionalScore:   &optionalScore,
 		Ignored:         "this should be ignored",
 		JsonData: json.RawMessage(`{"key": "value"}`),
-		JsonPtrData: &rawMessage,
+		 JsonPtrData: &rawMessage,
 		JsonSliceData: []json.RawMessage{
 			json.RawMessage(`{"slice_key1": "slice_value1"}`),
 			json.RawMessage(`{"slice_key2": "slice_value2"}`),
@@ -55,24 +74,38 @@ func TestBinaryEncoding(t *testing.T) {
 		JsonPointerSliceData: &[]json.RawMessage{
 			json.RawMessage(`{"pointer_slice_key1": "pointer_slice_value1"}`),
 			json.RawMessage(`{"pointer_slice_key2": "pointer_slice_value2"}`),
-		},
-		
-	}
+		},	 
+		Chain: [][][]configs.ChainId{
+	{
+		{chainId1, chainId2},    // s[0][0]
+		{"a3", "a4"},    // s[0][1]
+	},
+	{
+		{"b1", "b2"},    // s[1][0]
+		{"b3", "b4"},    // s[1][1]
+	},
+	{
+		{"c1", "c2"},    // s[2][0]
+	},
+},
+}
 
 	t.Run("BinarySize", func(t *testing.T) {
-		size := original.BinarySize()
+		size, _ := original.BinarySize()
 		if size <= 0 {
 			t.Errorf("BinarySize() returned %d, expected positive value", size)
 		}
+
 		t.Logf("Binary size: %d bytes", size)
 	})
+
 
 	t.Run("MarshalBinary", func(t *testing.T) {
 		data, err := original.MarshalBinary()
 		if err != nil {
 			t.Fatalf("MarshalBinary() failed: %v", err)
 		}
-		
+	
 		if len(data) == 0 {
 			t.Error("MarshalBinary() returned empty data")
 		}
@@ -80,11 +113,13 @@ func TestBinaryEncoding(t *testing.T) {
 		t.Logf("Marshaled data length: %d bytes", len(data))
 		
 		// Verify size estimation is reasonable
-		estimatedSize := original.BinarySize()
+		estimatedSize, _ := original.BinarySize()
 		if len(data) > estimatedSize*2 {
 			t.Errorf("Marshaled data size %d is much larger than estimated size %d", len(data), estimatedSize)
 		}
 	})
+
+
 
 	t.Run("UnmarshalBinary", func(t *testing.T) {
 		// Marshal original
@@ -131,27 +166,32 @@ func TestBinaryEncoding(t *testing.T) {
 		}
 
 		// Compare slice fields
-		if !bytes.Equal(restored.Data, original.Data) {
+		if (original.Data != nil && !bytes.Equal(restored.Data, original.Data)) || len(restored.Data) != len(original.Data) {
 			t.Errorf("Data mismatch: got %v, want %v", restored.Data, original.Data)
 		}
 		
-		if !reflect.DeepEqual(restored.Tags, original.Tags) {
-			t.Errorf("Tags mismatch: got %v, want %v", restored.Tags, original.Tags)
+		if (original.Tags != nil && !reflect.DeepEqual(restored.Tags, original.Tags)) || len(restored.Tags) != len(original.Tags) {
+			t.Errorf("Tags mismatch: got %+v==%v, want %+v==%v", restored.Tags, restored.Tags==nil, original.Tags, original.Tags==nil)
 		}
 		
-		if !reflect.DeepEqual(restored.EID, original.EID) {
-			t.Errorf("EID mismatch: got %v, want %v", restored.EID, original.EID)
+		if (original.EID != nil && !reflect.DeepEqual(restored.EID, original.EID)) || len(restored.EID) != len(original.EID) {
+			t.Errorf("EID mismatch: got %v==%v, want %v==%v", restored.EID, restored.EID == nil, original.EID, original.EID==nil)
+		}
+
+		if (original.Chain != nil && !reflect.DeepEqual(restored.Chain, original.Chain)) || len(restored.Chain) != len(original.Chain) {
+			t.Errorf("Chain mismatch: got %+v==%v, want %+v==%v", restored.Chain, restored.Chain==nil, original.Chain, original.Chain==nil)
 		}
 		
-		if !reflect.DeepEqual(restored.Versions, original.Versions) {
+		
+		if (original.Versions != nil && !reflect.DeepEqual(restored.Versions, original.Versions))  || len(restored.Versions) != len(original.Versions) {
 			t.Errorf("Versions mismatch: got %v, want %v", restored.Versions, original.Versions)
 		}
 		
-		if !reflect.DeepEqual(restored.Sizes, original.Sizes) {
+		if len(restored.Sizes) != len(original.Sizes) || (original.Sizes != nil && !reflect.DeepEqual(restored.Sizes, original.Sizes)) {
 			t.Errorf("Sizes mismatch: got %v, want %v", restored.Sizes, original.Sizes)
 		}
 
-		// Compare struct fields
+		//Compare struct fields
 		if restored.Path.ID != original.Path.ID {
 			t.Errorf("Path.ID mismatch: got %d, want %d", restored.Path.ID, original.Path.ID)
 		}
@@ -206,8 +246,9 @@ func TestBinaryEncoding(t *testing.T) {
 		if bytes.Equal(restored.JsonData, original.JsonData) == false {
 			t.Errorf("Ignored field should be empty, got: %s", restored.Ignored)
 		}
-	})
 
+	})
+	
 	t.Run("Encode", func(t *testing.T) {
 		encoded, err := original.Encode()
 		if err != nil {
@@ -231,7 +272,7 @@ func TestBinaryEncoding(t *testing.T) {
 		}
 	})
 
-	
+
 	t.Run("RoundTrip", func(t *testing.T) {
 		// Full round trip test
 		data, err := original.MarshalBinary()
@@ -321,6 +362,7 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 		}
 	})
 
+
 	t.Run("EmptySlices", func(t *testing.T) {
 		event := Event{
 			Timestamp: 12345,
@@ -354,7 +396,6 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 			t.Errorf("Paths should be empty, got length %d", len(restored.Paths))
 		}
 	})
-
 	t.Run("ExtremValues", func(t *testing.T) {
 		event := Event{
 			Timestamp: math.MaxUint64,
@@ -406,7 +447,7 @@ func BenchmarkBinaryEncoding(b *testing.B) {
 		Rating:    2.5,
 		Systems:   []System{"auth", "logging", "metrics", "tracing", "monitoring"},
 		Tags:      []string{"prod", "critical", "urgent", "high-priority", "monitored"},
-		Path: EventPath{
+		Path: &EventPath{
 			ID:        456,
 			Timestamp: 9876543210,
 		},
@@ -425,7 +466,7 @@ func BenchmarkBinaryEncoding(b *testing.B) {
 	b.Run("BinarySize", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_ = event.BinarySize()
+			_, _ = event.BinarySize()
 		}
 	})
 

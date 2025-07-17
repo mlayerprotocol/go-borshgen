@@ -31,6 +31,46 @@ import (
 //go:embed custom_encoders.go
 var customEncodersBytes []byte
 
+type TypeShape struct {
+	Name                   string     // e.g., "int32"
+	Field                  *FieldInfo // e.g., "int32"
+	IsSlice                bool
+	IsFixedArray           bool
+	FixedArrayLength       int
+	HasElement             bool
+	IsPointer              bool
+	Element                *TypeShape // recursive for nested types
+	PointerDeref           string
+	PointerRef             string
+	CustomElementEncoder   string
+	IsCustomElementEncoder bool
+	IsBasicType            bool
+	Parent                 *TypeShape
+	ElementType            string
+	FieldInfo
+}
+
+func templateDict(values ...interface{}) map[string]interface{} {
+	if len(values)%2 != 0 {
+		panic("dict expects even number of arguments")
+	}
+	dict := make(map[string]interface{}, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			panic("dict keys must be strings")
+		}
+		dict[key] = values[i+1]
+		if key == "Index" {
+			dict[key] = ((dict[key]).(int) ) + 1
+		}
+	}
+	if _, ok := dict["Index"]; !ok {
+		 dict["Index"] = 0
+	}
+	return dict
+}
+
 // Enhanced options with zero-copy support
 type GeneratorOptions struct {
 	PrimaryTag   string
@@ -61,38 +101,46 @@ func DefaultOptions() GeneratorOptions {
 
 // FieldInfo with zero-copy information
 type FieldInfo struct {
-	Name                  string
-	Type                  string
-	Tag                   string
-	IsPointer             bool
-	IsPointerElement      bool
-	PointerDeref          string
-	PointerRef            string
-	CustomEncoder         string
-	IsCustomEncoder       bool
-	ElementPointerRef     string
-	ElementPointerDeref   string
-	IsSlice               bool
-	IsPointerSlice        bool
-	IsMap                 bool
-	IsInterface           bool
-	IsStruct              bool
-	ElementType           string
-	IsOptional            bool
-	BinaryTag             string
-	IsBasicType           bool
-	IsBasicPointerType    bool
-	IsCustomType          bool
-	CustomTypeName        string
-	CustomElementTypeName string
-	ShouldIgnore          bool
-	CanZeroCopy           bool // NEW: Whether this field supports zero-copy
-	HasEncTag             bool // NEW: Whether field has "enc" or "encode" tag for deterministic encoding
-	EncOrder              int  // NEW: Sort order for deterministic encoding
-	SliceItem             int  // index of item if Type is Slice
-	ActualType            string
-	ResolvedType          *ResolvedTypeInfo `json:"resolved_type,omitempty"`
-	FullTypeName          string
+	Name                   string
+	TypeName                  string
+	Tag                    string
+	IsPointer              bool
+	IsPointerElement       bool
+	PointerDeref           string
+	PointerRef             string
+	CustomElementEncoder   string
+	CustomFieldEncoder     string
+	IsCustomElementEncoder bool
+	IsCustomFieldEncoder   bool
+	ElementPointerRef      string
+	ElementPointerDeref    string
+	IsSlice                bool
+	IsFixedArray           bool
+	FixedArrayLength       int
+	IsPointerSlice         bool
+	IsMap                  bool
+	IsInterface            bool
+	IsStruct               bool
+	ElementType            string
+	IsOptional             bool
+	BinaryTag              string
+	IsBasicType            bool
+	IsBasicPointerType     bool
+	IsCustomType           bool
+	CustomTypeName         string
+	CustomElementTypeName  string
+	ShouldIgnore           bool
+	CanZeroCopy            bool // NEW: Whether this field supports zero-copy
+	HasEncTag              bool // NEW: Whether field has "enc" or "encode" tag for deterministic encoding
+	EncOrder               int  // NEW: Sort order for deterministic encoding
+	SliceItem              int  // index of item if Type is Slice
+	ActualType             string
+	// ResolvedType           *ResolvedTypeInfo `json:"resolved_type,omitempty"`
+	FullTypeName           string
+	Element                *ResolvedTypeInfo
+	HasElement bool
+	Field      *FieldInfo
+	Index int
 }
 
 type StructInfo struct {
@@ -145,19 +193,20 @@ var templateFuncs = template.FuncMap{
 		}
 		return preceding
 	},
-	"unmarshalBasicTypeTemplate": func(field FieldInfo) string {
+	"unmarshalBasicTypeTemplate": func(field map[string]interface{}) string {
 		return UnmarshalBasicTypeFieldTemplate(field)
 	},
 	"isBasicElementType": func(field FieldInfo) bool {
-		return isBasicType(field.ElementType)
+		return isBasicType(field.Element.UnderlyingType.String())
 	},
+	"dict": templateDict,
 }
 
 // Complete template with all necessary functions
 const helperTemplate = templates.HelperTemplate
 
 // Complete template with all necessary functions
-const completeCodeTemplate = templates.MainTemplate
+const mainTemplate = templates.MainTemplate
 
 // canFieldZeroCopy determines if a field can support zero-copy reads
 func canFieldZeroCopy(fieldType string) bool {
@@ -208,7 +257,7 @@ func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOption
 					options.SafeMode = false
 				} else if option == "-no-pool" {
 					options.UsePooling = false
-				} else if strings.HasPrefix(option,"-encode-tag=") {
+				} else if strings.HasPrefix(option, "-encode-tag=") {
 					options.EncodeTag = strings.TrimPrefix(option, "-encode-tag=")
 				}
 			}
@@ -228,7 +277,7 @@ func isBasicType(typeName string) bool {
 		"uintptr": true,
 		"float32": true, "float64": true,
 		"complex64": true, "complex128": true,
-		"byte": true, "rune": true, "[]byte": true,
+		"byte": true, "rune": true,
 	}
 	return basicTypes[typeName]
 }
@@ -469,27 +518,67 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 
 					// Extract detailed type information if we have package context
 					if pkgInfo != nil {
-						resolvedTypeInfo = cg.resolveTypeInfo(fieldType.Type, pkgInfo)
+						resolvedTypeInfo = cg.resolveTypeInfo(fieldType.Type, pkgInfo, nil)
 					}
 				}
 			}
 			if resolvedTypeInfo != nil {
 
-				if resolvedTypeInfo.ElementType != nil {
-					actualType = resolvedTypeInfo.ElementType.TypeName
+				if resolvedTypeInfo.Element != nil {
+					actualType = resolvedTypeInfo.Element.TypeName
 				}
 			}
-			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, options)
 
-			if !fieldInfo.IsCustomEncoder && len(actualType) > 0 {
+			
+			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, resolvedTypeInfo, options)
+			
+			// Create nested ResolvedTypeInfo structure from TypesTree
+			if resolvedTypeInfo.TypesTree != nil && len(*resolvedTypeInfo.TypesTree) > 0 {
+				var result *ResolvedTypeInfo
+
+				// convert TypesTree to Element Tree
+				// Start from the last element and work backwards to create nested structure
+				for i := len(*resolvedTypeInfo.TypesTree) - 1; i >= 0; i-- {
+					current := &(*resolvedTypeInfo.TypesTree)[i]
+					current.Field = &fieldInfo
+					if current.Element != nil {
+						current.ElementType = current.Element.UnderlyingType.String()
+						
+					} else {
+						current.ElementType = current.UnderlyingType.String()
+					}
+					if strings.HasPrefix(current.TypeName, "*") {
+						(current).assignCustomElementEncoder(current.TypeName, "")
+					} else if strings.HasPrefix(current.TypeName, "[]"){
+						(current).assignCustomElementEncoder(current.TypeName, "")
+					} else {
+						(current).assignCustomElementEncoder(current.TypeName, "")
+					}
+					if len(current.TypeName) == 0 {
+						current.TypeName = current.ElementType
+					}
+					if current.ElementType != current.UnderlyingType.String() {
+						current.ElementType = cg.cleanPackagePath(current.UnderlyingType.String())
+					}
+					current.Element = result
+					result = current
+
+				}
+				// Store the root of the nested structure
+				fieldInfo.Element = result
+			}
+			
+			fmt.Printf("\nEMPTYTREE: %s::%s:: %+v\n", name.Name, resolvedTypeInfo.TypeName,  resolvedTypeInfo.TypesTree)
+
+			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {
 
 				fieldInfo.ActualType = actualType
-				if strings.Contains(fieldInfo.Type, ".") && len(fieldInfo.KnownImportedType()) == 0 {
-					fieldInfo.CustomTypeName = fieldInfo.Type
-					fieldInfo.Type = actualType
+				if strings.Contains(fieldInfo.TypeName, ".") && len(fieldInfo.KnownImportedType()) == 0 {
+					fieldInfo.CustomTypeName = fieldInfo.TypeName
+					fieldInfo.TypeName = actualType
 					if isBasicType(actualType) {
-						fieldInfo.IsBasicType = true
-						fieldInfo.ElementType = actualType
+						// fieldInfo.IsBasicType = true
+						// fieldInfo.Element = actualType
 						if fieldInfo.IsPointer {
 							fieldInfo.IsBasicPointerType = true
 						}
@@ -497,59 +586,52 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 
 			}
-			if fieldInfo.IsPointer && fieldInfo.ElementType == "" {
+			if fieldInfo.IsPointer && fieldInfo.Element != nil {
 				// If it's a pointer but no element type is set, use the actual type
 
 				fieldInfo.PointerDeref = "*"
 				fieldInfo.PointerRef = "&"
-				if resolvedTypeInfo.ElementType != nil {
-					fieldInfo.ElementType = resolvedTypeInfo.ElementType.UnderlyingType.String()
-				}
+
 
 			}
-			
-			if fieldInfo.Name == "DataType" {
 
-			}		
 			if resolvedTypeInfo != nil {
 				pkg := ""
 				ctype := ""
 				pksString := ""
-				 if len(resolvedTypeInfo.FullTypeName) > 0 {
+				if len(resolvedTypeInfo.FullTypeName) > 0 {
 					pksString = resolvedTypeInfo.FullTypeName
 					// pkg = resolvedTypeInfo.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.FullTypeName, ".")]
 					// ctype = resolvedTypeInfo.FullTypeName[strings.LastIndex(resolvedTypeInfo.FullTypeName, "/")+1:]
-				 } else	if resolvedTypeInfo.UnderlyingType!=nil && len(resolvedTypeInfo.UnderlyingType.String()) > 0 {
+				} else if resolvedTypeInfo.UnderlyingType != nil && len(resolvedTypeInfo.UnderlyingType.String()) > 0 {
 					pksString = resolvedTypeInfo.UnderlyingType.String()
 					// pkg = resolvedTypeInfo.UnderlyingType[0:strings.LastIndex(resolvedTypeInfo.UnderlyingType, ".")]
 					// ctype = resolvedTypeInfo.UnderlyingType[strings.LastIndex(resolvedTypeInfo.UnderlyingType, "/")+1:]
-				 } else {
-					if resolvedTypeInfo.ElementType != nil  {
-						if  len(resolvedTypeInfo.ElementType.FullTypeName) > 0 {
+				} else {
+					if resolvedTypeInfo.Element != nil {
+						if len(resolvedTypeInfo.Element.FullTypeName) > 0 {
 							pksString = resolvedTypeInfo.FullTypeName
-						} else if  resolvedTypeInfo.ElementType.UnderlyingType != nil &&  len(resolvedTypeInfo.ElementType.UnderlyingType.String()) > 0 {
-									pksString = resolvedTypeInfo.UnderlyingType.String()
+						} else if resolvedTypeInfo.Element.UnderlyingType != nil && len(resolvedTypeInfo.Element.UnderlyingType.String()) > 0 {
+							pksString = resolvedTypeInfo.UnderlyingType.String()
 						}
-						// pkg = resolvedTypeInfo.ElementType.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.ElementType.FullTypeName, ".")]
-						// ctype = resolvedTypeInfo.ElementType.FullTypeName[strings.LastIndex( resolvedTypeInfo.ElementType.FullTypeName, "/")+1:]
-					}  
+						// pkg = resolvedTypeInfo.Element.FullTypeName[0:strings.LastIndex(resolvedTypeInfo.Element.FullTypeName, ".")]
+						// ctype = resolvedTypeInfo.Element.FullTypeName[strings.LastIndex( resolvedTypeInfo.Element.FullTypeName, "/")+1:]
+					}
 
 				}
 				pksString = strings.ReplaceAll(pksString, "[]", "")
 				pksString = strings.ReplaceAll(pksString, "*", "")
-				if len(pksString) > 0  && strings.Contains(pksString, "."){
+				if len(pksString) > 0 && strings.Contains(pksString, ".") {
 					pkg = pksString[0:strings.LastIndex(pksString, ".")]
 					ctype = pksString[strings.LastIndex(pksString, "/")+1:]
 				}
-				
-				// fmt.Println("FOUUND: ", resolvedTypeInfo.TypeName, resolvedTypeInfo.FullTypeName, resolvedTypeInfo.PackagePath	)
-				
-				if resolvedTypeInfo.ElementType != nil {
-					fmt.Println("FOUUND: ", resolvedTypeInfo.ElementType.FullTypeName, resolvedTypeInfo.ElementType.PackagePath	)
+
+				if resolvedTypeInfo.Element != nil {
+					// fmt.Println(fmt.Sprintf("FOUUND: %+v ======\n%+v", resolvedTypeInfo.Element, fieldInfo))
 				}
 
 				if len(pkg) > 0 {
-					
+
 					cg.mu.Lock()
 
 					if pkg != cg.rootPackage && !specialTypes[ctype] {
@@ -563,35 +645,6 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 						}
 					}
 					cg.mu.Unlock()
-				}
-			}
-
-			if resolvedTypeInfo != nil && len(resolvedTypeInfo.FullTypeName) > 0 && !specialTypes[fieldInfo.CustomTypeName] {
-
-				if !fieldInfo.IsBasicType {
-
-					fieldInfo.ResolvedType = resolvedTypeInfo
-					if len(resolvedTypeInfo.FullTypeName) > 0 {
-						fieldInfo.FullTypeName = resolvedTypeInfo.FullTypeName
-						if resolvedTypeInfo.ElementType != nil {
-							// fmt.Printf("\nXXXXType: %s; ElementType: %s; %+v", resolvedTypeInfo.TypeName,  resolvedTypeInfo.ElementType.TypeName, resolvedTypeInfo.UnderlyingType)
-							if len(fieldInfo.CustomTypeName) == 0 {
-								fieldInfo.CustomTypeName = resolvedTypeInfo.TypeName
-							}
-							fieldInfo.Type = resolvedTypeInfo.UnderlyingType.String()
-							if len(resolvedTypeInfo.ElementType.TypeName) > 0 {
-								fieldInfo.ElementType = resolvedTypeInfo.ElementType.TypeName
-							}
-						} else {
-							fieldInfo.IsBasicType = isBasicType(fieldInfo.ActualType)
-							fieldInfo.ElementType = fieldInfo.ActualType
-						}
-						if isBasicType(fieldInfo.CustomTypeName) {
-							fieldInfo.CustomTypeName = ""
-						}
-
-					}
-
 				}
 			}
 
@@ -611,23 +664,40 @@ type ResolvedTypeInfo struct {
 	TypeName       string // e.g., "UUID"
 	FullTypeName   string // e.g., "github.com/google/uuid.UUID"
 	IsImported     bool   // true if from external package
-	IsBasic        bool   // true for built-in types
+	IsBasicType        bool   // true for built-in types
 	IsSlice        bool
+	IsPointerSlice bool
 	IsPointer      bool
 	IsStruct       bool
-	ElementType    *ResolvedTypeInfo // for slices/arrays/pointers
-	UnderlyingType types.Type        // the actual Go type
+	ElementType    string // for slices/arrays/pointers
+	UnderlyingType types.Type        // tfhe actual Go type
+	TypesTree      *[]ResolvedTypeInfo
+	PointerDeref   string
+	PointerRef     string
+	Element        *ResolvedTypeInfo
+	IsCustomElementEncoder bool
+	CustomElementEncoder string
+	CustomTypeName string
+	CustomFieldEncoder string
+	IsCustomFieldEncoder bool
+	Field *FieldInfo
+	IsFixedArray bool
+	FixedArrayLength int64
+	Index int
 }
 
 // resolveTypeInfo extracts detailed type information
-func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package) *ResolvedTypeInfo {
+func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, parentTypes []ResolvedTypeInfo) *ResolvedTypeInfo {
+	// Clone parentTypes to prevent mutation across recursion
+	currentPath := append([]ResolvedTypeInfo{}, parentTypes...)
+
 	info := &ResolvedTypeInfo{
 		UnderlyingType: t,
 	}
 
 	switch typ := t.(type) {
+
 	case *types.Named:
-		// This is a named type (could be from another package)
 		obj := typ.Obj()
 		if obj != nil && obj.Pkg() != nil {
 			info.PackagePath = obj.Pkg().Path()
@@ -635,50 +705,193 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package) *R
 			info.TypeName = obj.Name()
 			info.FullTypeName = fmt.Sprintf("%s.%s", obj.Pkg().Path(), obj.Name())
 
-			// Check if it's from an external package
 			if obj.Pkg() != pkg.Types {
 				info.IsImported = true
 			}
-
-			// Check if underlying type is a struct
 			if _, ok := typ.Underlying().(*types.Struct); ok {
 				info.IsStruct = true
 			}
 
-			underlyingInfo := cg.resolveTypeInfo(typ.Underlying(), pkg)
-			info.UnderlyingType = underlyingInfo.UnderlyingType
-			info.IsStruct = underlyingInfo.IsStruct
-			info.IsBasic = underlyingInfo.IsBasic
-			info.IsSlice = underlyingInfo.IsSlice
-			info.IsPointer = underlyingInfo.IsPointer
-			info.ElementType = underlyingInfo.ElementType
+			if len(parentTypes) == 0 {
+				currentPath = []ResolvedTypeInfo{{
+					TypeName:       cg.cleanPackagePath(typ.String()),
+					IsBasicType:        isBasicType(cg.cleanPackagePath(typ.String())) || isBasicType(cg.cleanPackagePath(typ.Underlying().String())),
+					UnderlyingType: typ.Underlying(),
+				}}
+			}
+			// currentPath = append(currentPath, cleanPackagePath(typ.String())) // use the actual type string
+			if typ.Underlying() != nil && !isBasicType(typ.Underlying().String()) {
+				fmt.Println("UNDERLYING", typ.Underlying().String())
+				child := cg.resolveTypeInfo(typ.Underlying(), pkg, currentPath)
+				// currentPath = append(currentPath, *child)
+				info.Element = child
+				info.TypesTree = child.TypesTree
+				if len(parentTypes) == 0 {
+					currentPath[len(currentPath)-1].Element = child
+				}
+
+			} else {
+				info.TypesTree = &currentPath
+			}
+
+			return info
 		}
 
 	case *types.Basic:
-		info.TypeName = typ.Name()
-		info.IsBasic = true
+		info.TypeName = cg.cleanPackagePath(typ.Name())
+		info.IsBasicType = true
+
+		currentPath = append(currentPath, ResolvedTypeInfo{
+			TypeName:       cg.cleanPackagePath(typ.String()),
+			IsBasicType:        true,
+			UnderlyingType: typ.Underlying(),
+		})
+		info.TypesTree = &currentPath
 
 	case *types.Slice:
+		if len(parentTypes) == 0 {
+			currentPath = []ResolvedTypeInfo{
+				{
+					TypeName:       cg.cleanPackagePath(t.String()),
+					IsBasicType:        false,
+					IsSlice:        true,
+					UnderlyingType: typ.Underlying(),
+				}}
+
+		}
+
 		info.IsSlice = true
-		// Recursively analyze element type
-		info.ElementType = cg.resolveTypeInfo(typ.Elem(), pkg)
+		currentPath = append(currentPath, ResolvedTypeInfo{
+			TypeName:      cg.cleanPackagePath(typ.Elem().String()),
+			IsBasicType:        isBasicType(cg.cleanPackagePath(typ.Elem().Underlying().String())),
+			IsSlice:        strings.HasPrefix(typ.Elem().Underlying().String(), "["),
+			IsFixedArray: strings.HasPrefix(typ.Elem().Underlying().String(), "[") && !strings.HasPrefix(typ.Elem().Underlying().String(), "[]"),
+			UnderlyingType: typ.Elem().Underlying(),
+		})
+			if currentPath[len(currentPath)-1].IsFixedArray {
+				currentPath[len(currentPath)-1].FixedArrayLength = typ.Elem().(*types.Array).Len()
+			}
+		// add element type to path
+		if !isBasicType(typ.Underlying().String()) {
+			child := cg.resolveTypeInfo(typ.Elem(), pkg, currentPath)
+		
+		currentPath[len(currentPath)-1].Element = child
+		info.Element = child
+
+		currentPath = *child.TypesTree
+		}
+		info.TypesTree = &currentPath
+		return info
+
+	case *types.Array:
+		if len(parentTypes) == 0 {
+			currentPath = []ResolvedTypeInfo{{
+				TypeName:       "[" + fmt.Sprint(typ.Len()) + "]" + cg.cleanPackagePath(typ.String()),
+				IsBasicType:        isBasicType(cg.cleanPackagePath(typ.String())),
+				IsSlice:        true,
+				UnderlyingType: typ.Underlying(),
+				IsFixedArray: true,
+				FixedArrayLength: typ.Len(),
+			}}
+		}
+
+		info.IsSlice = true
+
+		if typ.Elem() != nil {
+			currentPath = append(currentPath, ResolvedTypeInfo{
+				TypeName:       cg.cleanPackagePath(typ.Elem().String()),
+				IsBasicType:        isBasicType(cg.cleanPackagePath(typ.Elem().Underlying().String())),
+				IsSlice:        strings.HasPrefix(typ.Elem().Underlying().String(), "["),
+				IsFixedArray: strings.HasPrefix(typ.Elem().Underlying().String(), "[") && !strings.HasPrefix(typ.Elem().Underlying().String(), "[]"),
+			UnderlyingType: typ.Elem().Underlying(),
+		})
+			if currentPath[len(currentPath)-1].IsFixedArray {
+				currentPath[len(currentPath)-1].FixedArrayLength = typ.Elem().(*types.Array).Len()
+			}
+			if !isBasicType(typ.Underlying().String()) {
+			child := cg.resolveTypeInfo(typ.Elem(), pkg, currentPath)
+
+			info.Element = child
+			currentPath[len(currentPath)-1].Element = child
+			currentPath[len(currentPath)-1].IsBasicType = child.IsBasicType
+
+			
+			currentPath = append(currentPath, *child)
+			}
+			info.TypesTree = &currentPath
+		} else {
+			info.TypesTree = &currentPath
+		}
+		return info
 
 	case *types.Pointer:
+
 		info.IsPointer = true
-		// Analyze pointed-to type
-		info.ElementType = cg.resolveTypeInfo(typ.Elem(), pkg)
+		eltIsPointer  := strings.HasPrefix(typ.Elem().String(), "*")
+		currentPath = append(currentPath, ResolvedTypeInfo{
+			TypeName:       cg.cleanPackagePath(typ.Elem().String()),
+			IsBasicType:        isBasicType(cg.cleanPackagePath(typ.Elem().Underlying().String())),
+			IsSlice:        strings.HasPrefix(typ.Elem().Underlying().String(), "["),
+			UnderlyingType: typ.Elem().Underlying(),
+			IsPointer: true,
+			
+				IsPointerSlice: strings.HasPrefix(typ.Elem().String(), "["),
+				PointerDeref:   "*",
+				PointerRef:     "&",
+			
+		})
+		if eltIsPointer {
+			currentPath[len(currentPath)-1].PointerDeref = "*"
+			currentPath[len(currentPath)-1].PointerRef = "&"
+		}
+		child := cg.resolveTypeInfo(typ.Elem(), pkg, currentPath)
+		currentPath[len(currentPath)-1].Element = child
+		currentPath[len(currentPath)-1].IsPointer = child.IsPointer
+		currentPath[len(currentPath)-1].PointerDeref = child.PointerDeref
+		currentPath[len(currentPath)-1].PointerRef = child.PointerRef
+		info.Element = child
+		info.TypesTree = child.TypesTree
+		return info
 
 	case *types.Struct:
 		info.IsStruct = true
 		info.TypeName = "struct"
+		if named, ok := t.(*types.Named); ok {
+			obj := named.Obj()
+			if obj != nil {
+				info.TypeName = obj.Name() // e.g., MyStruct
+				currentPath = append(currentPath, ResolvedTypeInfo{
+					TypeName:       cg.cleanPackagePath(named.Obj().String()),
+					IsStruct:       true,
+					UnderlyingType: typ.Underlying(),
+				})
+			}
+		}
+
 	}
 
+	info.TypesTree = &currentPath
 	return info
+}
+
+func (cg *CodeGenerator) cleanPackagePath(s string,) string {
+	s = strings.ReplaceAll(s, cg.options.PackageName+".", "")
+	lastBracket := strings.LastIndex(s, "]")
+	firstPointer := strings.LastIndex(s, "*")
+	prefixEnd := max(lastBracket, firstPointer)
+	prefix := ""
+	if prefixEnd >= 0 {
+		prefix = s[:prefixEnd+1]
+	}
+	if strings.Contains(s, "/") {
+		return prefix + s[strings.LastIndex(s, "/")+1:]
+	}
+	return prefix + strings.Replace(s, prefix, "", 1)
 }
 
 // Helper method to check if a field is a known imported type that needs special handling
 func (fi *FieldInfo) KnownImportedType() string {
-	if fi.ResolvedType == nil || !fi.ResolvedType.IsImported {
+	if fi.Element == nil || !fi.Element.IsImported {
 		return ""
 	}
 
@@ -690,16 +903,16 @@ func (fi *FieldInfo) KnownImportedType() string {
 		// Add more as needed
 	}
 
-	return knownTypes[fi.ResolvedType.FullTypeName]
+	return knownTypes[fi.Element.FullTypeName]
 }
 
 // Helper method to get the marshal code for known types
 func (fi *FieldInfo) GetMarshalCode(varName string) (string, bool) {
-	if fi.ResolvedType == nil || !fi.ResolvedType.IsImported {
+	if fi.Element == nil || !fi.Element.IsImported {
 		return "", false
 	}
 
-	switch fi.ResolvedType.FullTypeName {
+	switch fi.Element.FullTypeName {
 	case "time.Time":
 		return fmt.Sprintf("binary.LittleEndian.PutUint64(buf[offset:], uint64(%s.Unix()))", varName), true
 	case "github.com/google/uuid.UUID", "encoding/json.RawMessage":
@@ -711,70 +924,92 @@ func (fi *FieldInfo) GetMarshalCode(varName string) (string, bool) {
 }
 
 // Helper method to get the marshal code for known types
-func (fieldInfo *FieldInfo) assignCustomEncoder(_fieldType string, prefix string) error {
+func (resolvedType *ResolvedTypeInfo) assignCustomElementEncoder(_fieldType string, prefix string) error {
 
-	//fmt.Println("ASSIGNCUSTOMENCODER", prefix, _fieldType, fieldInfo.Name, fieldInfo.Type, fieldInfo.CustomTypeName)
+	
 	switch _fieldType {
+	case "[]byte":
+		resolvedType.TypeName =  "[]byte"
+		resolvedType.CustomTypeName = prefix + "[]byte"
+		resolvedType.CustomElementEncoder = "_CustomByteArrayEncoder"
+		resolvedType.Element = &ResolvedTypeInfo{TypeName: "[]byte", IsBasicType: false}
+		resolvedType.IsCustomElementEncoder = true
 	case "time.Time":
-		fieldInfo.Type = "uint64"
-		fieldInfo.CustomTypeName = prefix + "time.Time"
-		fieldInfo.CustomElementTypeName = "time.Time"
-		fieldInfo.CustomEncoder = "_CustomTimeTimeEncoder"
-		fieldInfo.ElementType = "time.Time"
-		fieldInfo.IsCustomEncoder = true
+		resolvedType.TypeName =  "uint64"
+		resolvedType.CustomTypeName = prefix + "time.Time"
+		resolvedType.CustomElementEncoder = "_CustomTimeTimeEncoder"
+		resolvedType.Element = &ResolvedTypeInfo{TypeName: "time.Time", IsBasicType: true}
+		resolvedType.IsCustomElementEncoder = true
 
 	case "json.RawMessage", "*json.RawMessage":
 
-		fieldInfo.Type = "[]byte"
-		fieldInfo.CustomElementTypeName = "json.RawMessage"
-		fieldInfo.CustomTypeName = prefix + "json.RawMessage"
-		fieldInfo.CustomEncoder = "_CustomJsonRawMessageEncoder"
-		fieldInfo.ElementType = "json.RawMessage"
-		fieldInfo.IsCustomEncoder = true
-
+		resolvedType.TypeName = "json.RawMessage"
+		 resolvedType.CustomTypeName = prefix + "json.RawMessage"
+		resolvedType.CustomElementEncoder = "_CustomJsonRawMessageEncoder"
+		resolvedType.Element = &ResolvedTypeInfo{TypeName: "[]byte", UnderlyingType: types.NewArray(types.Typ[types.Byte], 16), IsBasicType: false, Element: &ResolvedTypeInfo{TypeName: "byte", UnderlyingType: types.Typ[types.Byte], IsBasicType: true}}
+		resolvedType.IsCustomElementEncoder = true
 	case "uuid.UUID":
-		fieldInfo.Type = "[16]byte"
-		fieldInfo.CustomElementTypeName = "uuid.UUID"
-		fieldInfo.CustomTypeName = prefix + "uuid.UUID"
-		fieldInfo.CustomEncoder = "_CustomUuidUUIDEncoder"
-		fieldInfo.ElementType = "json.RawMessage"
-		fieldInfo.IsCustomEncoder = true
+		resolvedType.TypeName = "[16]byte"
+		resolvedType.CustomTypeName = prefix + "uuid.UUID"
+		resolvedType.CustomElementEncoder = "_CustomUuidUUIDEncoder"
+		resolvedType.Element = &ResolvedTypeInfo{
+			TypeName: "[16]byte",
+			UnderlyingType: types.NewArray(types.Typ[types.Byte], 16),
+			IsBasicType: false,
+			Element: &ResolvedTypeInfo{
+				TypeName: "byte",
+				UnderlyingType: types.Typ[types.Byte],
+				IsBasicType: true,
+			},
+		}
+		resolvedType.IsCustomElementEncoder = true
 	default:
-		return fmt.Errorf("unsupported custom encoder type: %s", fieldInfo.CustomTypeName)
+		return fmt.Errorf("unsupported custom encoder type: %s", resolvedType.CustomTypeName)
 	}
-	fieldInfo.Type = fieldInfo.ElementType
-	fieldInfo.IsCustomType = true
-	fieldInfo.IsCustomEncoder = true
+
+
 	return nil
 
 }
 
+
+func getBaseFieldInfo(r *ResolvedTypeInfo) *ResolvedTypeInfo {
+	if r == nil {
+		return r
+	}
+	if r.Element == nil {
+		return r
+	}
+	return getBaseFieldInfo(r.Element)
+}
+
 // extractFieldInfo extracts information from a field
-func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualType string, options GeneratorOptions) FieldInfo {
+func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualType string, resolvedTypeInfo *ResolvedTypeInfo, options GeneratorOptions) FieldInfo {
+	resolvedTypeInfo = getBaseFieldInfo(resolvedTypeInfo)
 	fieldInfo := FieldInfo{
 		Name: name,
 	}
 
 	// Extract tag information with fallback
-	binaryTag, shouldIgnore, hasEncTag, customEncoder := cg.extractFieldTag(field, options)
+	binaryTag, shouldIgnore, hasEncTag, customFieldEncoder := cg.extractFieldTag(field, options)
 	fieldInfo.BinaryTag = binaryTag
 	fieldInfo.ShouldIgnore = shouldIgnore
 	fieldInfo.HasEncTag = hasEncTag
 
-	if len(customEncoder) > 0 {
-		if !strings.HasPrefix(customEncoder, "[]") && !strings.HasPrefix(customEncoder, "[][]") {
+	if len(customFieldEncoder) > 0 {
+		if !strings.HasPrefix(customFieldEncoder, "[]") && !strings.HasPrefix(customFieldEncoder, "[][]") {
 			fieldInfo.IsCustomType = true
-			fieldInfo.CustomTypeName = fieldInfo.Type
-			if isBasicType(customEncoder) {
-				fieldInfo.Type = customEncoder
+			fieldInfo.CustomTypeName = fieldInfo.TypeName
+			if isBasicType(customFieldEncoder) {
+				fieldInfo.TypeName = customFieldEncoder
 			} else {
-				fieldInfo.CustomEncoder = customEncoder
-				fieldInfo.IsCustomEncoder = true
+				fieldInfo.CustomFieldEncoder = customFieldEncoder
+				fieldInfo.IsCustomFieldEncoder = true
 			}
 		}
 	} else {
 		if isBasicType(actualType) || actualType == "[]byte" {
-			// customEncoder = actualType
+			// customFieldEncoder = actualType
 		}
 	}
 	if len(actualType) > 0 {
@@ -790,20 +1025,27 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 	if fieldInfo.BinaryTag == "" {
 		fieldInfo.BinaryTag = strings.ToLower(name)
 	}
+	// Create a TypeShape for type parsing, but don't assign to fieldInfo.Element
+	// since fieldInfo.Element is *ResolvedTypeInfo, not *TypeShape
+	// typeShape := &TypeShape{
+	// 	Name:  fieldInfo.Name,
+	// 	Field: &fieldInfo,
+	// }
 
 	// Extract type information
 	switch t := field.Type.(type) {
 	case *ast.Ident:
 
-		fieldInfo.Type = t.Name
+		fieldInfo.TypeName = t.Name
 
-		fieldInfo.IsBasicType = isBasicType(t.Name) || isBasicType(customEncoder) || isBasicType(actualType)
+		fieldInfo.IsBasicType = isBasicType(t.Name) || isBasicType(customFieldEncoder) || isBasicType(actualType)
+
 		fieldInfo.CanZeroCopy = canFieldZeroCopy(t.Name)
-		if cg.structMap[t.Name] || customEncoder == "struct" || customEncoder == "bin" {
+		if cg.structMap[t.Name] || customFieldEncoder == "struct" || customFieldEncoder == "bin" {
 			fieldInfo.IsStruct = true
 		}
 		// if fieldInfo.IsBasicType {
-		fieldInfo.ElementType = actualType
+		//fieldInfo.Element = actualType
 		// }
 
 	case *ast.StarExpr:
@@ -811,202 +1053,36 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 		fieldInfo.IsPointer = true
 		fieldInfo.PointerRef = "&"
 		fieldInfo.PointerDeref = "*"
-		if ident, ok := t.X.(*ast.Ident); ok {
-			if isBasicType(customEncoder) {
-				fieldInfo.Type = "*" + customEncoder
-			} else {
-				fieldInfo.Type = "*" + ident.Name
-			}
-			fieldInfo.ElementType = strings.ReplaceAll(ident.Name, "*", "")
-			fieldInfo.IsBasicPointerType = isBasicType(ident.Name) || isBasicType(customEncoder)
-			if cg.structMap[ident.Name] {
-				fieldInfo.IsStruct = true
-			}
-			fieldInfo.CustomElementTypeName = ident.Name
+		fieldInfo.HasElement = true
 
-		}
-		if t, ok := t.X.(*ast.ArrayType); ok {
-			if t.Len == nil { // slice
-
-				fieldInfo.IsPointerSlice = true
-				if ident, ok := t.Elt.(*ast.Ident); ok {
-					elementType := ident.Name
-					if len(customEncoder) > 0 {
-						elementType = customEncoder[2:]
-					}
-					fieldInfo.Type = "[]" + elementType
-					fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
-					// fieldInfo.ElementType = ident.Name
-					fieldInfo.IsPointerElement = strings.HasPrefix(elementType, "*")
-					fieldInfo.CustomTypeName = "[]" + ident.Name
-					fieldInfo.CustomElementTypeName = ident.Name
-
-					fieldInfo.ElementType = strings.ReplaceAll(elementType, "*", "")
-
-					// fieldInfo.IsBasicType = isBasicType(ident.Name)
-					if cg.structMap[ident.Name] {
-						fieldInfo.IsStruct = true
-					}
-
-				}
-			}
-			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
-				if pkgIdent, ok := t.X.(*ast.Ident); ok {
-
-					name := pkgIdent.Name + "." + t.Sel.Name
-					fieldInfo.Type = "*" + name
-					fieldInfo.ActualType = fieldInfo.Type
-					fieldInfo.IsCustomType = true
-					actualType = fieldInfo.Type
-
-					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
-						//fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-					}
-
-				}
-			}
-		}
-		if t, ok := t.X.(*ast.SelectorExpr); ok {
-			if pkgIdent, ok := t.X.(*ast.Ident); ok {
-
-				name := pkgIdent.Name + "." + t.Sel.Name
-				fieldInfo.Type = "*" + name
-				fieldInfo.ActualType = fieldInfo.Type
-				fieldInfo.IsCustomType = true
-				actualType = fieldInfo.Type
-
-				if err := (&fieldInfo).assignCustomEncoder(name, "*"); err != nil {
-					//	fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-				}
-			}
-		}
-
-	case *ast.ArrayType:
-
-		if t.Len == nil { // slice
-			fieldInfo.IsSlice = true
-			if ident, ok := t.Elt.(*ast.Ident); ok {
-
-				elementType := ident.Name
-				if len(customEncoder) > 0 {
-					elementType = customEncoder[2:]
-				}
-				fieldInfo.Type = "[]" + elementType
-				fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
-				// fieldInfo.ElementType = ident.Name
-				fieldInfo.IsPointerElement = strings.HasPrefix(elementType, "*")
-				fieldInfo.CustomTypeName = "[]" + ident.Name
-				fieldInfo.CustomElementTypeName = ident.Name
-				fieldInfo.ElementType = strings.ReplaceAll(elementType, "*", "")
-				// if ident.Name == "byte" {
-				// 	fieldInfo.IsBasicType = true
-				// }
-				if cg.structMap[ident.Name] {
-					fieldInfo.IsStruct = true
-				}
-
-			}
-			if t, ok := t.Elt.(*ast.StarExpr); ok {
-				fieldInfo.IsPointerElement = true
-				fieldInfo.ElementPointerRef = "&"
-				fieldInfo.ElementPointerDeref = "*"
-				if ident, ok := t.X.(*ast.Ident); ok {
-					// if isBasicType(customEncoder) {
-					// 	fieldInfo.ElementType = "*" + customEncoder
-					// } else {
-					// 	fieldInfo.ElementType = "*" + ident.Name
-					// }
-					fieldInfo.ElementType = strings.ReplaceAll(ident.Name, "*", "")
-					// fieldInfo.IsBasicType = isBasicType(ident.Name) || isBasicType(customEncoder)
-					// if cg.structMap[ident.Name] {
-					// 	fieldInfo.IsStruct = true
-					// }
-				}
-				if t, ok := t.X.(*ast.SelectorExpr); ok {
-					if ident, ok := t.X.(*ast.Ident); ok {
-						fieldInfo.CustomTypeName = "[]*" + ident.Name + "." + t.Sel.Name
-						fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
-
-						name := ident.Name + "." + t.Sel.Name
-						fieldInfo.Type = "[]*" + name
-						fieldInfo.ActualType = fieldInfo.Type
-						fieldInfo.IsCustomType = true
-						actualType = fieldInfo.Type
-
-						if err := (&fieldInfo).assignCustomEncoder(name, "[]*"); err != nil {
-							fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-						}
-
-					}
-				}
-
-			}
-			if t, ok := t.Elt.(*ast.SelectorExpr); ok {
-				if ident, ok := t.X.(*ast.Ident); ok {
-					fieldInfo.CustomTypeName = "[]" + ident.Name + "." + t.Sel.Name
-					fieldInfo.CustomElementTypeName = ident.Name + "." + t.Sel.Name
-
-					name := ident.Name + "." + t.Sel.Name
-					fieldInfo.Type = "*" + name
-					fieldInfo.ActualType = fieldInfo.Type
-					fieldInfo.IsCustomType = true
-					actualType = fieldInfo.Type
-
-					if err := (&fieldInfo).assignCustomEncoder(name, "[]"); err != nil {
-						// fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-					}
-
-				}
-			}
-			if t, ok := t.Elt.(*ast.ArrayType); ok {
-
-				if ident, ok := t.Elt.(*ast.Ident); ok {
-					elementType := ident.Name
-					if len(customEncoder) > 0 {
-						elementType = strings.ReplaceAll(customEncoder, "[]", "")
-					}
-					fieldInfo.Type = "[][]" + elementType
-					fieldInfo.CanZeroCopy = canFieldZeroCopy(fieldInfo.Type) || canFieldZeroCopy(customEncoder)
-					fieldInfo.CustomElementTypeName = "[]" + ident.Name
-					fieldInfo.ElementType = "[]" + strings.ReplaceAll(elementType, "*", "")
-
-					// fieldInfo.IsBasicType = isBasicType(ident.Name)
-					if cg.structMap[ident.Name] {
-						fieldInfo.IsStruct = true
-					}
-
-				}
-			}
-		}
 	case *ast.MapType:
+
 		fieldInfo.IsMap = true
-		fieldInfo.Type = "map[string]interface{}"
+		fieldInfo.TypeName = "map[string]interface{}"
 	case *ast.InterfaceType:
+
 		fieldInfo.IsInterface = true
-		fieldInfo.Type = "interface{}"
+		fieldInfo.TypeName = "interface{}"
 	case *ast.SelectorExpr:
+		//typeShape.ExtractElement(t.X, resolvedTypeInfo)
+		fieldInfo.IsBasicType = false
 		if pkgIdent, ok := t.X.(*ast.Ident); ok {
 
 			name := pkgIdent.Name + "." + t.Sel.Name
-			fieldInfo.Type = name
-			fieldInfo.ActualType = fieldInfo.Type
+			fieldInfo.TypeName = name
+			fieldInfo.ActualType = fieldInfo.TypeName
 			fieldInfo.IsCustomType = true
-			actualType = fieldInfo.Type
-
-			if err := (&fieldInfo).assignCustomEncoder(name, ""); err != nil {
-				// fmt.Println(fmt.Errorf("failed to assign custom encoder for field %s: %v", name, err))
-			}
-
+			actualType = fieldInfo.TypeName
 		}
 	}
-	if isBasicType(customEncoder) {
+	if isBasicType(customFieldEncoder) {
 		fieldInfo.IsCustomType = true
-		actualType = customEncoder
+		actualType = customFieldEncoder
 	}
-	if !fieldInfo.IsCustomEncoder && len(actualType) > 0 && actualType != fieldInfo.Type {
-		fieldInfo.CustomTypeName = fieldInfo.Type
+	if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 && actualType != fieldInfo.TypeName {
+		fieldInfo.CustomTypeName = fieldInfo.TypeName
 		if !fieldInfo.IsSlice {
-			fieldInfo.Type = actualType
+			// fieldInfo.Type = actualType
 			fieldInfo.IsCustomType = true
 		}
 
@@ -1029,11 +1105,7 @@ func (cg *CodeGenerator) getCode(outputFile string) (header *bytes.Buffer, main 
 	}); err != nil {
 		return nil, nil, fmt.Errorf("failed to execute helper template: %v", err)
 	}
-	tmpl, err := template.New("binary").Funcs(templateFuncs).Parse(completeCodeTemplate)
-	if err != nil {
-		return header, main, err
-	}
-
+	tmpl := cg.initTemplate()
 	if len(cg.structs) == 0 {
 		return header, main, fmt.Errorf("empty structs")
 	}
@@ -1054,13 +1126,22 @@ func (cg *CodeGenerator) getCode(outputFile string) (header *bytes.Buffer, main 
 	return header, main, err
 }
 
+func (cg *CodeGenerator) initTemplate() *template.Template {
+	tmpl := template.New("binary")
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.BinarySizeFunctionTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.BinarySizeTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.EncodeTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.MarshalTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.MarshalBinaryTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.UnmarshalTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.UnmarshalBinaryTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(mainTemplate))
+	return tmpl
+}
 // generateCode generates the binary encoding/decoding code
 func (cg *CodeGenerator) generateCode(outputFile string) (err error) {
 
-	tmpl, err := template.New("binary").Funcs(templateFuncs).Parse(completeCodeTemplate)
-	if err != nil {
-		return err
-	}
+	tmpl :=cg.initTemplate()
 
 	dir := filepath.Dir(outputFile)
 	hash := make([]byte, 4)
@@ -1083,10 +1164,6 @@ func (cg *CodeGenerator) generateCode(outputFile string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to parse helper template: %v", err)
 	}
-
-	// if len(cg.structs) == 0 {
-	// 	return fmt.Errorf("no structs to generate")
-	// }
 
 	if err := helperTmpl.Execute(helperOut, struct {
 		Package string
