@@ -35,13 +35,19 @@ func printWarning(message ...any) {
 	yellow := "\033[33m"
 	reset := "\033[0m"
 
-	fmt.Println(yellow, "Warning:", "⚠️", message, reset)
+	fmt.Print(yellow, "[Warning]: ", "⚠️")
+	fmt.Print(message...)
+	fmt.Println(reset)
 }
+
 func printError(message ...any) {
 	red := "\033[31m"
 	reset := "\033[0m"
 
-	fmt.Println(red, "Error:", "❌", message, reset)
+	fmt.Print(red, "[Error]: ")
+	fmt.Print(red, "❌")
+	fmt.Print(message...)
+	fmt.Println(reset)
 }
 type TypeShape struct {
 	Name                   string     // e.g., "int32"
@@ -582,7 +588,8 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// Store the root of the nested structure
 				fieldInfo.Element = result
 			} else {
-				panic(fmt.Errorf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+				printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+				panic("")
 			}
 		
 			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {

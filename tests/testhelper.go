@@ -86,6 +86,7 @@ type EventPath struct {
 //go:generate borshgen -tag=msg -fallback=json
 type Event struct {
 	// Basic types
+	Any any `msg:"a" enc:"f"`
 	ID        ID `msg:"id" enc:""`
 	EventType constants.EventType `msg:"type" enc:""`
 	FixedSliceCustom [][32]byte  `msg:"fsc,_FixedSliceEncoder" enc:""`

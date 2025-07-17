@@ -94,6 +94,12 @@ func getFixedBytes(data []byte, offset, length int) ([]byte, int, error) {
 }
 
 func marshalValue(v interface{}) ([]byte, error) {
+	if be, ok := v.([]byte); ok {
+			return be, nil
+	}
+	if be, ok := v.(string); ok {
+			return []byte(be), nil
+	}
 	if bm, ok := v.(BinaryMarshaler); ok {
 		return bm.MarshalBinary()
 	}
@@ -101,6 +107,14 @@ func marshalValue(v interface{}) ([]byte, error) {
 }
 
 func unmarshalValue(data []byte, v interface{}) error {
+	if be, ok := v.(*[]byte); ok {
+		*be = data
+		return nil
+	}
+	if be, ok := v.(*string); ok {
+		*be = string(data)
+		return nil
+	}
 	if bu, ok := v.(BinaryUnMarshaler); ok {
 		return bu.UnmarshalBinary(data)
 	}
@@ -108,6 +122,13 @@ func unmarshalValue(data []byte, v interface{}) error {
 }
 
 func encodeValue(v interface{}) ([]byte, error) {
+	if be, ok := v.([]byte); ok {
+		return be, nil
+	}
+	if be, ok := v.(string); ok {
+		return []byte(be), nil
+	}
+		
 	if be, ok := v.(BinaryEncoder); ok {
 		return be.Encode()
 	}
@@ -116,6 +137,9 @@ func encodeValue(v interface{}) ([]byte, error) {
 
 
 func binarySize(v interface{}) (int, error) {
+	if be, ok := v.([]byte); ok {
+		return len(be), nil
+	}
 	if be, ok := v.(BinaryMarshaler); ok {
 		return be.BinarySize()
 	}
