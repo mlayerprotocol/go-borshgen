@@ -726,7 +726,6 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 			}
 			// currentPath = append(currentPath, cleanPackagePath(typ.String())) // use the actual type string
 			if typ.Underlying() != nil && !isBasicType(typ.Underlying().String()) {
-				fmt.Println("UNDERLYING", typ.Underlying().String())
 				child := cg.resolveTypeInfo(typ.Underlying(), pkg, currentPath)
 				// currentPath = append(currentPath, *child)
 				info.Element = child
