@@ -433,6 +433,7 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 					if typeSpec, ok := spec.(*ast.TypeSpec); ok {
 						if _, ok := typeSpec.Type.(*ast.StructType); ok {
 							if found, _ := findGenerateComment(node, typeSpec); found {
+								
 								cg.structMap[typeSpec.Name.Name] = true
 							}
 						}
@@ -456,6 +457,8 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 								cg.options = options
 
 								// Pass the package for enhanced type resolution
+								fmt.Printf("   ProcessingStruct: %v", typeSpec.Name.Name)
+								fmt.Println()
 								structInfo := cg.extractStructInfo(typeSpec.Name.Name, structType, options, info, pkg)
 								cg.structs = append(cg.structs, structInfo)
 							}
@@ -578,6 +581,8 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				}
 				// Store the root of the nested structure
 				fieldInfo.Element = result
+			} else {
+				printWarning("No element for field:", name.Name)
 			}
 		
 			if !fieldInfo.IsCustomElementEncoder && len(actualType) > 0 {
