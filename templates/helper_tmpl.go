@@ -115,7 +115,7 @@ func encodeValue(v interface{}) ([]byte, error) {
 		return []byte(be), nil
 	}
 		
-	if be, ok := v.(BinaryEncoder); ok {
+	if be, ok := v.(BorshEncoder); ok {
 		return be.Encode()
 	}
 	return nil, fmt.Errorf("unsupported type for encoding: %T", v)
