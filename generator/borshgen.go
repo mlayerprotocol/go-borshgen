@@ -596,7 +596,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// Store the root of the nested structure
 				fieldInfo.Element = result
 				fieldInfo.ElementType = result.ElementType
-				
+
 
 			} else {
 				if !fieldInfo.IsCustomFieldEncoder {
@@ -734,6 +734,54 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 	}
 
 	switch typ := t.(type) {
+
+
+		case *types.Alias:
+		obj := typ.Obj()
+		if obj != nil && obj.Pkg() != nil {
+			info.PackagePath = obj.Pkg().Path()
+			info.PackageName = obj.Pkg().Name()
+			info.TypeName = obj.Name()
+			info.FullTypeName = fmt.Sprintf("%s.%s", obj.Pkg().Path(), obj.Name())
+			
+			if obj.Pkg() != pkg.Types {
+				info.IsImported = true
+			}
+			if _, ok := typ.Underlying().(*types.Struct); ok {
+
+				info.IsStruct = true
+			}
+			this := ResolvedTypeInfo{
+				TypeName:      cg.cleanPackagePath(typ.String()),
+				IsBasicType:     isBasicType(cg.cleanPackagePath(typ.String())) || isBasicType(cg.cleanPackagePath(typ.Underlying().String())),
+				UnderlyingType: typ.Underlying(),
+			}
+			if this.UnderlyingType != nil {
+				this.ElementType = cg.cleanPackagePath(this.UnderlyingType.String())
+			}
+
+			if len(parentTypes) == 0 {
+				currentPath = []ResolvedTypeInfo{this}
+			} else {
+				currentPath = append(currentPath, this)
+			}
+			// currentPath = append(currentPath, cleanPackagePath(typ.String())) // use the actual type string
+			if typ.Underlying() != nil && !isBasicType(typ.Underlying().String()) {
+				child := cg.resolveTypeInfo(typ.Underlying(), pkg, currentPath)
+				// currentPath = append(currentPath, *child)
+				currentPath = *child.TypesTree
+				info.Element = child
+				info.TypesTree = child.TypesTree
+				if len(parentTypes) == 0 {
+					currentPath[len(currentPath)-1].Element = child
+				}
+
+			} else {
+				info.TypesTree = &currentPath
+			}
+
+			return info
+		}
 
 	case *types.Named:
 		obj := typ.Obj()
