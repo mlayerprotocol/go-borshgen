@@ -288,13 +288,13 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 		{
 		
 		{{if .IsCustomFieldEncoder}}
-			data, err := {{.CustomFieldEncoder}}.Encode(({{.PointerDeref}}(s.{{.Name}})))
+			data, err := {{.CustomFieldEncoder}}.Encode(({{.PointerDeref}}(s.{{.Name}})), s)
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}
 			buf = append(buf, data...)
 		{{else if .IsCustomElementEncoder}}
-			data, err := {{.CustomElementEncoder}}.Encode(({{.PointerDeref}}(s.{{.Name}})))
+			data, err := {{.CustomElementEncoder}}.Encode(({{.PointerDeref}}(s.{{.Name}})), s)
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}

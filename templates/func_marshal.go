@@ -46,13 +46,13 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 		{
 
 		{{if .IsCustomFieldEncoder}}
-			data, err := {{.CustomFieldEncoder}}.MarshalBinary(({{.PointerDeref}}(s.{{.Name}})))
+			data, err := {{.CustomFieldEncoder}}.MarshalBinary(({{.PointerDeref}}(s.{{.Name}})), s)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
 			}
 			buf = appendBytes(buf, data)
 		{{else if .IsCustomElementEncoder}}
-			data, err := {{.CustomElementEncoder}}.MarshalBinary(({{.PointerDeref}}(s.{{.Name}})))
+			data, err := {{.CustomElementEncoder}}.MarshalBinary(({{.PointerDeref}}(s.{{.Name}})), s)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
 			}

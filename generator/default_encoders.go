@@ -36,7 +36,7 @@ var _DefaultByteArrayEncoder = DefaultByteArrayEncoder{}
 
 type DefaultJsonRawMessageEncoder struct {}
 
-func (c DefaultJsonRawMessageEncoder) MarshalBinary(field any) ([]byte, error) {
+func (c DefaultJsonRawMessageEncoder) MarshalBinary(field any, parentStruct any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}
@@ -51,14 +51,14 @@ func (c DefaultJsonRawMessageEncoder) UnmarshalBinary(data []byte) (any, error) 
 	return m, nil
 }
 
-func (c DefaultJsonRawMessageEncoder) BinarySize(field any) (int, error) {
+func (c DefaultJsonRawMessageEncoder) BinarySize(field any, parentStruct any) (int, error) {
 if field == nil {
 			return 0, nil
 		}
 		return len( field.(json.RawMessage)), nil
 	
 }
-func (c DefaultJsonRawMessageEncoder) Encode(field any) ([]byte, error) {
+func (c DefaultJsonRawMessageEncoder) Encode(field any, parent any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}
@@ -71,7 +71,7 @@ func (c DefaultJsonRawMessageEncoder) Encode(field any) ([]byte, error) {
 
 type DefaultByteArrayEncoder struct {}
 
-func (c DefaultByteArrayEncoder) MarshalBinary(field any) ([]byte, error) {
+func (c DefaultByteArrayEncoder) MarshalBinary(field any, parentStruct any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}
@@ -86,13 +86,13 @@ func (c DefaultByteArrayEncoder) UnmarshalBinary(data []byte) (any, error) {
 	return m, nil
 }
 
-func (c DefaultByteArrayEncoder) BinarySize(field any) (int, error) {
+func (c DefaultByteArrayEncoder) BinarySize(field any, parentStruct any) (int, error) {
 	if field == nil {
 			return 0, nil
 		}
 		return len(field.([]byte)), nil
 }
-func (c DefaultByteArrayEncoder) Encode(field any) ([]byte, error) {
+func (c DefaultByteArrayEncoder) Encode(field any, parentStruct any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}

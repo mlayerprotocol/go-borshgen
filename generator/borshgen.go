@@ -596,6 +596,7 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// Store the root of the nested structure
 				fieldInfo.Element = result
 				fieldInfo.ElementType = result.ElementType
+				
 
 			} else {
 				if !fieldInfo.IsCustomFieldEncoder {

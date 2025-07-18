@@ -14,7 +14,7 @@ type CustomFixedSliceEncoder struct {
 	CustomElementEncoder
 }
 
-func (c CustomFixedSliceEncoder) MarshalBinary(field any) ([]byte, error) {
+func (c CustomFixedSliceEncoder) MarshalBinary(field any, parent any) ([]byte, error) {
 	if v , ok := field.([][32]byte); ok {
 		out := make([]byte,  len(v)*32)
 		for _, item := range v {
@@ -52,7 +52,7 @@ func (c CustomFixedSliceEncoder) UnmarshalBinary(data []byte) (any, error) {
 	return nil, fmt.Errorf("invalid input length: %d (not multiple of 32 or 64)", len(data))
 }
 
-func (c CustomFixedSliceEncoder) BinarySize(field any) (int, error) {
+func (c CustomFixedSliceEncoder) BinarySize(field any,  parent any) (int, error) {
 	
 	if v, ok :=  field.([][32]uint8); ok {
 		
@@ -66,8 +66,8 @@ func (c CustomFixedSliceEncoder) BinarySize(field any) (int, error) {
 		return 0, fmt.Errorf("unsupported type: %T", field)
 }
 
-func (c CustomFixedSliceEncoder) Encode(field any) ([]byte, error) {
-	bz, err := c.MarshalBinary(field)
+func (c CustomFixedSliceEncoder) Encode(field any,  parent any) ([]byte, error) {
+	bz, err := c.MarshalBinary(field,  parent)
 	if err != nil {
 			return nil, err
 	}
