@@ -21,18 +21,18 @@ func (s {{.Name}}) BinarySize() (int, error) {
 		
 		{
 		{{if .IsCustomFieldEncoder}}
-			s, err := {{.CustomFieldEncoder}}.BinarySize({{.PointerDeref}}s.{{.Name}})
+			_size, err := {{.CustomFieldEncoder}}.BinarySize({{.PointerDeref}}s.{{.Name}})
 				if err != nil {
 						return 0, fmt.Errorf("failed to calculate binary size for custom encoder {{.Name}}: %v", err)
 				}
-				size += 2 + s
+				size += 2 + _size
 		
 		{{else if .IsCustomElementEncoder}}
-				s, err := {{.CustomElementEncoder}}.BinarySize({{.PointerDeref}}s.{{.Name}})
+				_size, err := {{.CustomElementEncoder}}.BinarySize({{.PointerDeref}}s.{{.Name}})
 				if err != nil {
 					return 0, fmt.Errorf("failed to calculate binary size for custom encoder {{.Name}}: %v", err)
 				}
-				size += 2 + s
+				size += 2 + _size
 		{{ else if .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}

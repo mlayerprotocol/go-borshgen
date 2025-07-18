@@ -88,6 +88,7 @@ type Event struct {
 	// Basic types
 	Any any `msg:"a,_DefaultByteArrayEncoder" enc:"f"`
 	ID        ID `msg:"id" enc:""`
+	PointerArray []*EventPath `msg:"par" enc:""`
 	EventType constants.EventType `msg:"type" enc:""`
 	FixedSliceCustom [][32]byte  `msg:"fsc,_FixedSliceEncoder" enc:""`
 	FixedSlice [][32]byte  `msg:"fs" enc:""`

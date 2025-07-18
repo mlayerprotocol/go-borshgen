@@ -90,6 +90,7 @@ func TestBinaryEncoding(t *testing.T) {
 },
 }
 
+
 	t.Run("BinarySize", func(t *testing.T) {
 		size, _ := original.BinarySize()
 		if size <= 0 {
@@ -98,6 +99,7 @@ func TestBinaryEncoding(t *testing.T) {
 
 		t.Logf("Binary size: %d bytes", size)
 	})
+
 
 
 	t.Run("MarshalBinary", func(t *testing.T) {
@@ -118,6 +120,7 @@ func TestBinaryEncoding(t *testing.T) {
 			t.Errorf("Marshaled data size %d is much larger than estimated size %d", len(data), estimatedSize)
 		}
 	})
+
 
 
 
@@ -321,6 +324,7 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 		}
 	})
 
+
 	t.Run("NilPointers", func(t *testing.T) {
 		event := Event{
 			Timestamp: 12345,
@@ -361,6 +365,7 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 			t.Error("OptionalScore should be nil after round trip")
 		}
 	})
+
 
 
 	t.Run("EmptySlices", func(t *testing.T) {

@@ -13,9 +13,12 @@ type BinaryMarshaler interface {
 type BinaryUnMarshaler interface {
 	UnmarshalBinary(data []byte) error
 }
+type BinaryEncoder interface {
+Encode() ([]byte, error)
+}
 
 type BorshEncoder interface {
-	Encode() ([]byte, error)
+	BinaryEncoder
 	BinaryMarshaler
 	BinaryUnMarshaler
 }

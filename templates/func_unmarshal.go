@@ -36,8 +36,8 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) (error) {
 				if _v, err := {{.CustomFieldEncoder}}.UnmarshalBinary(itemData); err != nil {
 					return fmt.Errorf("failed to unmarshal custom field encoder slice {{.Name}}]: %v", err)
 				} else {
-				 	{{ if .Element.ElementType }}
-				 		_m := (_v).({{ .Element.ElementType }})
+				 	{{ if .Element.TypeName }}
+				 		_m := (_v).({{ .Element.TypeName }})
 					{{else}}
 					
 						_m := (_v)
@@ -76,23 +76,24 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) (error) {
 					// Type: {{ .Element.TypeName }}
 					// ActualType: {{ .ActualType }}
 					// BasicType: {{ .Element.IsBasicType }}
-			
+					// IsStruct: {{ .IsStruct }}
 					// ElementType: {{ .Element.TypeName }}
+					// IsPointer: {{ .IsPointer}}
 
 
 					{{template "unmarshalScalarElement"  dict
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
-					"ElementType" .ElementType
-					"TypeName" .TypeName
-					"IsPointer" .IsPointer
-					"PointerDeref" .PointerDeref
-					"PointerRef" .PointerRef
-					"IsCustomElementEncoder" .IsCustomElementEncoder
-					"CustomElementEncoder" .CustomElementEncoder
-					"IsStruct" .IsStruct
-					"IsBasicType" .IsBasicType
-					"Element" .Element
+					"ElementType" .Element.ElementType
+					"TypeName" .Element.TypeName
+					"IsPointer" .Element.IsPointer
+					"PointerDeref" .Element.PointerDeref
+					"PointerRef" .Element.PointerRef
+					"IsCustomElementEncoder" .Element.IsCustomElementEncoder
+					"CustomElementEncoder" .Element.CustomElementEncoder
+					"IsStruct" .Element.IsStruct
+					"IsBasicType" .Element.IsBasicType
+					"Element" .Element.Element
 					"Field" .
 					}}
 			
