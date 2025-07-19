@@ -57,7 +57,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 				return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
 			}
 			buf = appendBytes(buf, data)
-		{{ else if and .Element .Element.IsSlice  }}
+		{{ else if and .Element .IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}
 				// Type: {{ .Element.TypeName }}
@@ -102,6 +102,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					"FieldName" .Name
 					"ElementType" .Element.ElementType
 					"TypeName" .Element.TypeName
+					"IsSlice" .IsSlice
 					"IsPointer" .Element.IsPointer
 					"PointerDeref" .Element.PointerDeref
 					"PointerRef" .Element.PointerRef

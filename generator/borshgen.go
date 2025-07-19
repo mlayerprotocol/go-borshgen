@@ -552,6 +552,11 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			}
 
 			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, resolvedTypeInfo, options)
+			if resolvedTypeInfo == nil {
+				printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+					panic("")
+				} else {
+			}
 
 			// Create nested ResolvedTypeInfo structure from TypesTree
 			if resolvedTypeInfo.TypesTree != nil && len(*resolvedTypeInfo.TypesTree) > 0 {
@@ -560,7 +565,12 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 				// convert TypesTree to Element Tree
 				// Start from the last element and work backwards to create nested structure
 				for i := len(*resolvedTypeInfo.TypesTree) - 1; i >= 0; i-- {
+					
 					current := &(*resolvedTypeInfo.TypesTree)[i]
+					if (strings.Contains(current.TypeName, "invalid") || strings.Contains(current.TypeName, "map")) && !fieldInfo.IsCustomFieldEncoder {
+						// printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+						panic(fmt.Errorf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
+					}
 					current.Field = &fieldInfo
 					if result != nil {
 						current.ElementType = cg.cleanPackagePath(result.UnderlyingType.String())
@@ -727,6 +737,10 @@ type ResolvedTypeInfo struct {
 // resolveTypeInfo extracts detailed type information
 func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, parentTypes []ResolvedTypeInfo) *ResolvedTypeInfo {
 	// Clone parentTypes to prevent mutation across recursion
+	fmt.Println("TYPEOOEOE", t.String())
+	if t.String() == "invalid" {
+			return nil
+		}
 	currentPath := append([]ResolvedTypeInfo{}, parentTypes...)
 
 	info := &ResolvedTypeInfo{
@@ -784,6 +798,7 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 		}
 
 	case *types.Named:
+		
 		obj := typ.Obj()
 		if obj != nil && obj.Pkg() != nil {
 			info.PackagePath = obj.Pkg().Path()
@@ -872,10 +887,17 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 		// 	currentPath[len(currentPath)-1].FixedArrayLength = typ.Elem().(*types.Array).Len()
 		// }
 		// add element type to path
-		if !isBasicType(typ.Underlying().String()) {
+		if !isBasicType(typ.Underlying().String()) && typ.Elem() != nil {
 			child := cg.resolveTypeInfo(typ.Elem(), pkg, currentPath)
+		
 			currentPath = *child.TypesTree
-			currentPath[cpLenBeforeResolve].Element = child
+			if len(*child.TypesTree) > cpLenBeforeResolve {
+				currentPath[cpLenBeforeResolve].Element = child
+			} else {
+				if cpLenBeforeResolve > 0 {
+					currentPath[cpLenBeforeResolve-1].Element = child
+				}
+			}
 			info.Element = child
 
 			currentPath = *child.TypesTree
@@ -920,9 +942,18 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 			if !isBasicType(typ.Underlying().String()) {
 				child := cg.resolveTypeInfo(typ.Elem(), pkg, currentPath)
 				currentPath = *child.TypesTree
-				info.Element = child
+				if len(*child.TypesTree) > cpLenBeforeResolve {
 				currentPath[cpLenBeforeResolve].Element = child
 				currentPath[cpLenBeforeResolve].IsBasicType = child.IsBasicType
+				} else {
+					if cpLenBeforeResolve > 0 {
+						currentPath[cpLenBeforeResolve-1].Element = child
+				currentPath[cpLenBeforeResolve-1].IsBasicType = child.IsBasicType
+					}
+				}
+				info.Element = child
+
+				
 
 				currentPath = append(currentPath, *child)
 			}
@@ -996,8 +1027,11 @@ func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, pa
 				})
 			}
 		}
+	default:
+		panic(fmt.Errorf("detected invalid type: %T", typ))
 
 	}
+	
 
 	info.TypesTree = &currentPath
 	return info

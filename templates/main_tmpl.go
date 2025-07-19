@@ -299,6 +299,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}
 			buf = append(buf, data...)
+			
 		{{ else if and .Element .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}
@@ -342,6 +343,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 					{{template "encodeScalarElement" dict
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
+					"IsSlice" .IsSlice
 					"ElementType" .Element.ElementType
 					"IsPointer" .Element.IsPointer
 					"PointerRef" .Element.PointerRef
