@@ -367,7 +367,6 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 	})
 
 
-
 	t.Run("EmptySlices", func(t *testing.T) {
 		event := Event{
 			Timestamp: 12345,
