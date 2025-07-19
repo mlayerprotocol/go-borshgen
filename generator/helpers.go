@@ -171,12 +171,12 @@ func UnmarshalBasicTypeFieldTemplate(f map[string]interface {}) string {
 			isPointer = true
 		}
 	}
-	isSlice := false
-	if f["IsSlice"] != nil {
-		if b, ok := f["IsSlice"].(bool); ok && b {
-			isSlice = true
-		}
-	}
+	// isSlice := false
+	// if f["IsSlice"] != nil {
+	// 	if b, ok := f["IsSlice"].(bool); ok && b {
+	// 		isSlice = true
+	// 	}
+	// }
 	ctype := "";
 	ctype = typeName
 	
