@@ -10,7 +10,7 @@ type BinaryMarshaler interface {
 	BinarySize() (int, error)
 }
 
-type BinaryUnMarshaler interface {
+type BinaryUnmarshaler interface {
 	UnmarshalBinary(data []byte) error
 }
 type BinaryEncoder interface {
@@ -20,7 +20,7 @@ Encode() ([]byte, error)
 type BorshEncoder interface {
 	BinaryEncoder
 	BinaryMarshaler
-	BinaryUnMarshaler
+	BinaryUnmarshaler
 }
 
 

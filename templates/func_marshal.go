@@ -57,7 +57,7 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 				return nil, fmt.Errorf("failed to marshal {{.Name}}: %v", err)
 			}
 			buf = appendBytes(buf, data)
-		{{ else if and .Element .IsSlice  }}
+		{{ else if or .IsSlice  .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.TypeName}}
 				// Type: {{ .Element.TypeName }}
@@ -80,16 +80,16 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					{{template "marshalScalarElement"  dict
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
-					"TypeName" .TypeName
-					"ElementType" .ElementType
-					"IsPointer" .IsPointer
-					"PointerDeref" .PointerDeref
-					"PointerRef" .PointerRef
-					"IsCustomElementEncoder" .IsCustomElementEncoder
-					"CustomElementEncoder" .CustomElementEncoder
-					"IsStruct" .IsStruct
-					"IsBasicType" .IsBasicType
-					"Element" .Element
+					"TypeName" .Element.TypeName
+					"ElementType" .Element.ElementType
+					"IsPointer" .Element.IsPointer
+					"PointerDeref" .Element.PointerDeref
+					"PointerRef" .Element.PointerRef
+					"IsCustomElementEncoder" .Element.IsCustomElementEncoder
+					"CustomElementEncoder" .Element.CustomElementEncoder
+					"IsStruct" .Element.IsStruct
+					"IsBasicType" .Element.IsBasicType
+					"Element" .Element.Element
 					"Field" .
 					}}
 			
@@ -100,18 +100,18 @@ func (s {{.Name}}) MarshalBinary() ([]byte, error) {
 					{{template "marshalScalarElement" dict
 					"Var" (printf "s.%s" .Name)
 					"FieldName" .Name
-					"ElementType" .Element.ElementType
-					"TypeName" .Element.TypeName
+					"ElementType" .ElementType
+					"TypeName" .TypeName
 					"IsSlice" .IsSlice
-					"IsPointer" .Element.IsPointer
-					"PointerDeref" .Element.PointerDeref
-					"PointerRef" .Element.PointerRef
-					"IsCustomElementEncoder" .Element.IsCustomElementEncoder
-					"CustomElementEncoder" .Element.CustomElementEncoder
-					"IsStruct" .Element.IsStruct
-					"IsBasicType" .Element.IsBasicType
-					"Element" .Element.Element
-					"Field" .Element.Field
+					"IsPointer" .IsPointer
+					"PointerDeref" .PointerDeref
+					"PointerRef" .PointerRef
+					"IsCustomElementEncoder" .IsCustomElementEncoder
+					"CustomElementEncoder" .CustomElementEncoder
+					"IsStruct" .IsStruct
+					"IsBasicType" .IsBasicType
+					"Element" .Element
+					"Field" .Field
 				}}
 			{{end}}
 				

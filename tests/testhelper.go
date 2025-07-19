@@ -87,7 +87,7 @@ type EventPath struct {
 type Event struct {
 	// Basic types
 	Any any `msg:"a,_DefaultByteArrayEncoder" enc:"f"`
-	ArrayAny []any `msg:"aa,_DefaultByteArrayEncoder" enc:"f"`
+	ArrayAny []any `msg:"aa," enc:"f"`
 	ID        ID `msg:"id" enc:""`
 	
 	PointerArray []*EventPath `msg:"par" enc:""`

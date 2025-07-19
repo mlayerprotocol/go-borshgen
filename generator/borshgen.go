@@ -579,8 +579,11 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 					if strings.HasPrefix(current.TypeName, "*") {
 						(current).assignCustomElementEncoder(current.TypeName, "")
 					} else if strings.HasPrefix(current.TypeName, "[]") {
+						
 						(current).assignCustomElementEncoder(current.TypeName, "")
+						fmt.Println("TYPEOOEOE", current.CustomElementEncoder)
 					} else {
+						
 						(current).assignCustomElementEncoder(current.TypeName, "")
 					}
 					if len(current.TypeName) == 0 {
@@ -737,7 +740,7 @@ type ResolvedTypeInfo struct {
 // resolveTypeInfo extracts detailed type information
 func (cg *CodeGenerator) resolveTypeInfo(t types.Type, pkg *packages.Package, parentTypes []ResolvedTypeInfo) *ResolvedTypeInfo {
 	// Clone parentTypes to prevent mutation across recursion
-	fmt.Println("TYPEOOEOE", t.String())
+	
 	if t.String() == "invalid" {
 			return nil
 		}

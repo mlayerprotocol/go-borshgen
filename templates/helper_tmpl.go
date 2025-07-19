@@ -101,7 +101,7 @@ func unmarshalValue(data []byte, v interface{}) error {
 		*be = string(data)
 		return nil
 	}
-	if bu, ok := v.(BinaryUnMarshaler); ok {
+	if bu, ok := v.(BinaryUnmarshaler); ok {
 		return bu.UnmarshalBinary(data)
 	}
 	return fmt.Errorf("unsupported type for unmarshaling: %T", v)

@@ -60,7 +60,7 @@ func (s *{{.Name}}) UnmarshalBinary(data []byte) (error) {
 					{{end}}
 					s.{{.Name}} = {{.PointerRef}}_m
 			}
-		{{ else if .Element.IsSlice  }}
+		{{ else if or .IsSlice  .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
 				// ElementType: {{.Element.ElementType}}
 				// Type: {{ .Element.TypeName }}
