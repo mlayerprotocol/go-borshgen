@@ -187,7 +187,7 @@ func UnmarshalBasicTypeFieldTemplate(f map[string]interface {}) string {
 	
 	ctype = strings.ReplaceAll(ctype, "*", "")
 	t := elementType
-	if (len(elementType) == 0 ) || ((isSlice || isPointer) && elementType != "") {
+	if (len(elementType) == 0 )  {
 		t = typeName
 	}
 
