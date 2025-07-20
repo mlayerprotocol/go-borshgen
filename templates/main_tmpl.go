@@ -392,10 +392,6 @@ func (s *{{.Name}}) UnmarshalBinaryZeroCopy(data []byte) (*{{.Name}}View, error)
 }
 {{end}}
 
-// just a placeholder for the math package
-func (s *{{.Name}}) mathPlaceHolder()  bool {
-	return math.Ceil(0) == 0
-}
 
 
 

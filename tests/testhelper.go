@@ -78,11 +78,16 @@ type ID int64
 type System string
 
 //go:generate borshgen -tag=msg -fallback=json
+type EntityPath struct {
+	Name string
+}
+
+//go:generate borshgen -tag=msg -fallback=json
 type EventPath struct {
+	EntityPath
 	ID        ID     `msg:"id,int64" enc:""`
 	Timestamp uint64 `msg:"ts" enc:""`
 }
-
 //go:generate borshgen -tag=msg -fallback=json
 type Event struct {
 	// Basic types

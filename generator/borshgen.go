@@ -528,7 +528,13 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 	}
 
 	for _, field := range structType.Fields.List {
+		if len(field.Names) == 0 {
+			if c, ok := field.Type.(*ast.Ident); ok {
+				field.Names = append(field.Names, c)
+			}
+		}
 		for _, name := range field.Names {
+			
 			actualType := ""
 			var resolvedTypeInfo *ResolvedTypeInfo
 
@@ -581,7 +587,6 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 					} else if strings.HasPrefix(current.TypeName, "[]") {
 						
 						(current).assignCustomElementEncoder(current.TypeName, "")
-						fmt.Println("TYPEOOEOE", current.CustomElementEncoder)
 					} else {
 						
 						(current).assignCustomElementEncoder(current.TypeName, "")
