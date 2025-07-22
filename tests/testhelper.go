@@ -14,7 +14,7 @@ type CustomFixedSliceEncoder struct {
 	CustomElementEncoder
 }
 
-func (c CustomFixedSliceEncoder) MarshalBinary(field any, parent any) ([]byte, error) {
+func (c CustomFixedSliceEncoder) MarshalBorsh(field any, parent any) ([]byte, error) {
 	if v , ok := field.([][32]byte); ok {
 		out := make([]byte,  len(v)*32)
 		for _, item := range v {
@@ -33,7 +33,7 @@ func (c CustomFixedSliceEncoder) MarshalBinary(field any, parent any) ([]byte, e
 	
 }
 
-func (c CustomFixedSliceEncoder) UnmarshalBinary(data []byte) (any, error) {
+func (c CustomFixedSliceEncoder) UnmarshalBorsh(data []byte) (any, error) {
 	if len(data)%32 == 0 {
 		n := len(data) / 32
 		out := make([][32]byte, n)
@@ -67,7 +67,7 @@ func (c CustomFixedSliceEncoder) BinarySize(field any,  parent any) (int, error)
 }
 
 func (c CustomFixedSliceEncoder) Encode(field any,  parent any) ([]byte, error) {
-	bz, err := c.MarshalBinary(field,  parent)
+	bz, err := c.MarshalBorsh(field,  parent)
 	if err != nil {
 			return nil, err
 	}

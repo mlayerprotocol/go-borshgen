@@ -263,7 +263,7 @@ func (v *{{.Name}}View) calculateFieldOffset(fieldName string) int {
 // ToStruct converts the view to a regular struct (performs copying)
 func (v *{{.Name}}View) ToStruct() (*{{.Name}}, error) {
 	var s {{.Name}}
-	err := s.UnmarshalBinary(v.data)
+	err := s.UnmarshalBorsh(v.data)
 	return &s, err
 }
 	{{end}}
@@ -375,7 +375,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 {{if $options.ZeroCopy}}
 // ToView converts the struct to a zero-copy view
 func (s *{{.Name}}) ToView() (*{{.Name}}View, error) {
-	data, err := s.MarshalBinary()
+	data, err := s.MarshalBorsh()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal struct to binary: %v", err)
 	}
@@ -390,8 +390,8 @@ func (s *{{.Name}}) ToView() (*{{.Name}}View, error) {
 {{template "binarySize" .}}
 
 {{if $options.ZeroCopy}}
-// UnmarshalBinaryZeroCopy creates a zero-copy view
-func (s *{{.Name}}) UnmarshalBinaryZeroCopy(data []byte) (*{{.Name}}View, error) {
+// UnmarshalBorshZeroCopy creates a zero-copy view
+func (s *{{.Name}}) UnmarshalBorshZeroCopy(data []byte) (*{{.Name}}View, error) {
 	return New{{.Name}}View(data)
 }
 {{end}}

@@ -6,12 +6,12 @@ import (
 )
 
 type BinaryMarshaler interface {
-	MarshalBinary() ([]byte, error)
+	MarshalBorsh() ([]byte, error)
 	BinarySize() (int, error)
 }
 
 type BinaryUnmarshaler interface {
-	UnmarshalBinary(data []byte) error
+	UnmarshalBorsh(data []byte) error
 }
 type BinaryEncoder interface {
 Encode() ([]byte, error)
@@ -25,8 +25,8 @@ type BorshEncoder interface {
 
 
 type CustomElementEncoder interface {
-	MarshalBinary(field any) ([]byte, error)
-	UnmarshalBinary(data []byte) (any, error)
+	MarshalBorsh(field any) ([]byte, error)
+	UnmarshalBorsh(data []byte) (any, error)
 	BinarySize(field any) (int, error)
 	Encode(field any) ([]byte, error)
 	
@@ -36,7 +36,7 @@ var _DefaultByteArrayEncoder = DefaultByteArrayEncoder{}
 
 type DefaultJsonRawMessageEncoder struct {}
 
-func (c DefaultJsonRawMessageEncoder) MarshalBinary(field any, parentStruct any) ([]byte, error) {
+func (c DefaultJsonRawMessageEncoder) MarshalBorsh(field any, parentStruct any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}
@@ -46,7 +46,7 @@ func (c DefaultJsonRawMessageEncoder) MarshalBinary(field any, parentStruct any)
 		return []byte(f), nil
 	}
 }
-func (c DefaultJsonRawMessageEncoder) UnmarshalBinary(data []byte) (any, error) {
+func (c DefaultJsonRawMessageEncoder) UnmarshalBorsh(data []byte) (any, error) {
 	m := json.RawMessage(data)
 	return m, nil
 }
@@ -71,7 +71,7 @@ func (c DefaultJsonRawMessageEncoder) Encode(field any, parent any) ([]byte, err
 
 type DefaultByteArrayEncoder struct {}
 
-func (c DefaultByteArrayEncoder) MarshalBinary(field any, parentStruct any) ([]byte, error) {
+func (c DefaultByteArrayEncoder) MarshalBorsh(field any, parentStruct any) ([]byte, error) {
 	if field == nil {
 			return []byte{}, nil
 		}
@@ -81,7 +81,7 @@ func (c DefaultByteArrayEncoder) MarshalBinary(field any, parentStruct any) ([]b
 		return f, nil
 	}
 }
-func (c DefaultByteArrayEncoder) UnmarshalBinary(data []byte) (any, error) {
+func (c DefaultByteArrayEncoder) UnmarshalBorsh(data []byte) (any, error) {
 	m := data
 	return m, nil
 }

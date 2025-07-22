@@ -103,7 +103,7 @@ func marshalValue(v interface{}) ([]byte, error) {
 			return []byte(be), nil
 	}
 	if bm, ok := v.(BinaryMarshaler); ok {
-		return bm.MarshalBinary()
+		return bm.MarshalBorsh()
 	}
 	return nil, fmt.Errorf("unsupported type for marshaling: %T", v)
 }
@@ -118,7 +118,7 @@ func unmarshalValue(data []byte, v interface{}) error {
 		return nil
 	}
 	if bu, ok := v.(BinaryUnmarshaler); ok {
-		return bu.UnmarshalBinary(data)
+		return bu.UnmarshalBorsh(data)
 	}
 	return fmt.Errorf("unsupported type for unmarshaling: %T", v)
 }

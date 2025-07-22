@@ -1310,9 +1310,9 @@ func (cg *CodeGenerator) initTemplate() *template.Template {
 	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.BinarySizeTemplate))
 	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.EncodeTemplate))
 	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.MarshalTemplate))
-	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.MarshalBinaryTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.MarshalBorshTemplate))
 	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.UnmarshalTemplate))
-	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.UnmarshalBinaryTemplate))
+	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(templates.UnmarshalBorshTemplate))
 	tmpl = template.Must(tmpl.Funcs(templateFuncs).Parse(mainTemplate))
 	return tmpl
 }

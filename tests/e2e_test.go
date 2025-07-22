@@ -102,14 +102,14 @@ func TestBinaryEncoding(t *testing.T) {
 
 
 
-	t.Run("MarshalBinary", func(t *testing.T) {
-		data, err := original.MarshalBinary()
+	t.Run("MarshalBorsh", func(t *testing.T) {
+		data, err := original.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() failed: %v", err)
+			t.Fatalf("MarshalBorsh() failed: %v", err)
 		}
 	
 		if len(data) == 0 {
-			t.Error("MarshalBinary() returned empty data")
+			t.Error("MarshalBorsh() returned empty data")
 		}
 		
 		t.Logf("Marshaled data length: %d bytes", len(data))
@@ -124,18 +124,18 @@ func TestBinaryEncoding(t *testing.T) {
 
 
 
-	t.Run("UnmarshalBinary", func(t *testing.T) {
+	t.Run("UnmarshalBorsh", func(t *testing.T) {
 		// Marshal original
-		data, err := original.MarshalBinary()
+		data, err := original.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() failed: %v", err)
+			t.Fatalf("MarshalBorsh() failed: %v", err)
 		}
 
 		// Unmarshal into new struct
 		var restored Event
-		err = restored.UnmarshalBinary(data)
+		err = restored.UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() failed: %v", err)
 		}
 
 		// Compare basic fields
@@ -278,21 +278,21 @@ func TestBinaryEncoding(t *testing.T) {
 
 	t.Run("RoundTrip", func(t *testing.T) {
 		// Full round trip test
-		data, err := original.MarshalBinary()
+		data, err := original.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() failed: %v", err)
+			t.Fatalf("MarshalBorsh() failed: %v", err)
 		}
 
 		var restored Event
-		err = restored.UnmarshalBinary(data)
+		err = restored.UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() failed: %v", err)
 		}
 
 		// Marshal the restored struct
-		data2, err := restored.MarshalBinary()
+		data2, err := restored.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("Second MarshalBinary() failed: %v", err)
+			t.Fatalf("Second MarshalBorsh() failed: %v", err)
 		}
 
 		// Data should be identical after round trip
@@ -307,15 +307,15 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 	t.Run("EmptyStruct", func(t *testing.T) {
 		var empty Event
 		
-		data, err := empty.MarshalBinary()
+		data, err := empty.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() on empty struct failed: %v", err)
+			t.Fatalf("MarshalBorsh() on empty struct failed: %v", err)
 		}
 		t.Logf("MARSHALED %+v", data)
 		var restored Event
-		err = restored.UnmarshalBinary(data)
+		err = restored.UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() on empty struct failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() on empty struct failed: %v", err)
 		}
 		
 		// Verify basic equality for zero values
@@ -338,15 +338,15 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 			OptionalScore:   nil,
 		}
 		
-		data, err := event.MarshalBinary()
+		data, err := event.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() with nil pointers failed: %v", err)
+			t.Fatalf("MarshalBorsh() with nil pointers failed: %v", err)
 		}
 		
 		var restored Event
-		err = restored.UnmarshalBinary(data)
+		err = restored.UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() with nil pointers failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() with nil pointers failed: %v", err)
 		}
 		
 		if restored.ID != 0 {
@@ -376,15 +376,15 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 			Paths:     []EventPath{}, // Empty slice
 		}
 		
-		data, err := event.MarshalBinary()
+		data, err := event.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() with empty slices failed: %v", err)
+			t.Fatalf("MarshalBorsh() with empty slices failed: %v", err)
 		}
 		
 		var restored Event
-		err = restored.UnmarshalBinary(data)
+		err = restored.UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() with empty slices failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() with empty slices failed: %v", err)
 		}
 		
 		if len(restored.Systems) != 0 {
@@ -408,15 +408,15 @@ func TestBinaryEncodingEdgeCases(t *testing.T) {
 			Rating:    math.MaxFloat32,
 		}
 		
-		data, err := event.MarshalBinary()
+		data, err := event.MarshalBorsh()
 		if err != nil {
-			t.Fatalf("MarshalBinary() with extreme values failed: %v", err)
+			t.Fatalf("MarshalBorsh() with extreme values failed: %v", err)
 		}
 		
 		var restored Event
-		err = (&restored).UnmarshalBinary(data)
+		err = (&restored).UnmarshalBorsh(data)
 		if err != nil {
-			t.Fatalf("UnmarshalBinary() with extreme values failed: %v", err)
+			t.Fatalf("UnmarshalBorsh() with extreme values failed: %v", err)
 		}
 		
 		t.Logf("%+v", restored)
@@ -474,18 +474,18 @@ func BenchmarkBinaryEncoding(b *testing.B) {
 		}
 	})
 
-	b.Run("MarshalBinary", func(b *testing.B) {
+	b.Run("MarshalBorsh", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := event.MarshalBinary()
+			_, err := event.MarshalBorsh()
 			if err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
 
-	b.Run("UnmarshalBinary", func(b *testing.B) {
-		data, err := event.MarshalBinary()
+	b.Run("UnmarshalBorsh", func(b *testing.B) {
+		data, err := event.MarshalBorsh()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -493,7 +493,7 @@ func BenchmarkBinaryEncoding(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 		restored := Event{}
-			err := restored.UnmarshalBinary(data)
+			err := restored.UnmarshalBorsh(data)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -513,12 +513,12 @@ func BenchmarkBinaryEncoding(b *testing.B) {
 	b.Run("RoundTrip", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			data, err := event.MarshalBinary()
+			data, err := event.MarshalBorsh()
 			if err != nil {
 				b.Fatal(err)
 			}
 			var restored Event
-			err = restored.UnmarshalBinary(data)
+			err = restored.UnmarshalBorsh(data)
 			if err != nil {
 				b.Fatal(err)
 			}
