@@ -77,7 +77,7 @@ func (c CustomFixedSliceEncoder) Encode(field any,  parent any) ([]byte, error) 
 type ID int64
 type System string
 
-//go:generate borshgen -tag=msg -fallback=json
+//go:generate borshgen -tag=msg -fallback=json -pool-size=LG
 type EntityPath struct {
 	Name string
 }

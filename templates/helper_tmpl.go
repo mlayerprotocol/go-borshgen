@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"bytes"
 	{{if .Options.UsePooling}}"sync"{{end}}
 	{{if and .Options.ZeroCopy (not .Options.SafeMode)}}"unsafe"{{end}}
 )
@@ -23,9 +24,22 @@ const (
 
 {{if .Options.UsePooling}}
 // Buffer pool for encoding
-var binaryBufPool = sync.Pool{
+
+var binaryBufPoolXS = &sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 0, 8192)
+		return bytes.NewBuffer(make([]byte, 0, 1024))
+	},
+}
+
+var binaryBufPoolMD = &sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, 2048))
+	},
+}
+
+var binaryBufPoolLG = &sync.Pool{
+	New: func() interface{} {
+		return bytes.NewBuffer(make([]byte, 0, 8184))
 	},
 }
 {{end}}
@@ -38,47 +52,49 @@ func bytesToStringUnsafe(b []byte) string {
 }
 {{end}}
 
-// Helper functions for appending data
-func appendUint16(buf []byte, v uint16) []byte {
-	return append(buf, byte(v), byte(v>>8))
+// Helper functions for appending data to a bytes.Buffer
+func appendUint16(buf *bytes.Buffer, v uint16) {
+	buf.Write([]byte{byte(v), byte(v >> 8)})
 }
 
-func appendUint32(buf []byte, v uint32) []byte {
-	return append(buf, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+func appendUint32(buf *bytes.Buffer, v uint32) {
+	buf.Write([]byte{
+		byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24),
+	})
 }
 
-func appendUint64(buf []byte, v uint64) []byte {
-	return append(buf,
-		byte(v), byte(v>>8), byte(v>>16), byte(v>>24),
-		byte(v>>32), byte(v>>40), byte(v>>48), byte(v>>56))
+func appendUint64(buf *bytes.Buffer, v uint64) {
+	buf.Write([]byte{
+		byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24),
+		byte(v >> 32), byte(v >> 40), byte(v >> 48), byte(v >> 56),
+	})
 }
 
-func appendBytes(buf, data []byte) []byte {
-	buf = appendUint16(buf, uint16(len(data)))
-	return append(buf, data...)
+func appendBytes(buf *bytes.Buffer, data []byte) {
+	// Write length as uint16
+	appendUint16(buf, uint16(len(data)))
+	// Write data
+	buf.Write(data)
 }
 
 func getBytes(data []byte, offset int) ([]byte, int, error) {
 	if offset+2 > len(data) {
 		return nil, offset, errors.New("buffer too short for length")
 	}
-	length := binary.LittleEndian.Uint16(data[offset:offset+2])
+	length := binary.LittleEndian.Uint16(data[offset : offset+2])
 	offset += 2
 	if offset+int(length) > len(data) {
 		return nil, offset, errors.New("buffer too short for data")
 	}
-	return data[offset:offset+int(length)], offset+int(length), nil
+	return data[offset : offset+int(length)], offset + int(length), nil
 }
 
 func getFixedBytes(data []byte, offset, length int) ([]byte, int, error) {
 	if offset+length > len(data) {
 		return nil, offset, errors.New("buffer too short for length")
 	}
-	
-	
-	return data[offset:offset+length], offset+int(length), nil
+	return data[offset : offset+length], offset + length, nil
 }
-
 func marshalValue(v interface{}) ([]byte, error) {
 	if be, ok := v.([]byte); ok {
 			return be, nil

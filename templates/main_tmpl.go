@@ -6,17 +6,21 @@ const MainTemplate = `
 package {{.Package}}
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	{{if and .Options.ZeroCopy (not .Options.SafeMode)}}"unsafe"{{end}}
 	{{ range .Packages }}"{{ .Package }}"
 	{{end}}
 )
 {{ range .Packages }}var _ {{ .CustomType }}
 {{end}}
+var _ bytes.Buffer
+var _  sync.Pool
 var _ = fmt.Print
 var _ = errors.New("")
 var _ = binary.MaxVarintLen16
@@ -267,7 +271,7 @@ func (v *{{.Name}}View) ToStruct() (*{{.Name}}, error) {
 
 	// Encode creates a deterministic encoding of fields with "enc" tag
 func (s {{.Name}}) Encode() ([]byte, error) {
-	var buf []byte
+	var buf  = &bytes.Buffer{}
 	
 	{{range sortedEncFields .Fields}}
 	// Field: {{.Name}} (tag: {{.BinaryTag}})
@@ -292,13 +296,13 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}
-			buf = append(buf, data...)
+			buf.Write(data)
 		{{else if .IsCustomElementEncoder}}
 			data, err := {{.CustomElementEncoder}}.Encode(({{.PointerDeref}}(s.{{.Name}})), s)
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode {{.Name}}: %v", err)
 			}
-			buf = append(buf, data...)
+			buf.Write(data)
 			
 		{{ else if and .Element .Element.IsSlice  }}
 				// {{.Name}} ({{.BinaryTag}}) - slice
@@ -365,7 +369,7 @@ func (s {{.Name}}) Encode() ([]byte, error) {
 	}
 	{{end}}
 
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
 {{if $options.ZeroCopy}}

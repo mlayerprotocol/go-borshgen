@@ -102,6 +102,7 @@ type GeneratorOptions struct {
 	MaxStringLen int
 	MaxSliceLen  int
 	EncodeTag    string
+	PoolSize string
 }
 
 func DefaultOptions() GeneratorOptions {
@@ -115,6 +116,7 @@ func DefaultOptions() GeneratorOptions {
 		MaxStringLen: 65535 * 200,
 		MaxSliceLen:  65535,
 		EncodeTag:    "enc",
+		PoolSize:  "MD",
 	}
 }
 
@@ -278,6 +280,8 @@ func parseGenerateComment(commentGroup *ast.CommentGroup) (bool, GeneratorOption
 					options.UsePooling = false
 				} else if strings.HasPrefix(option, "-encode-tag=") {
 					options.EncodeTag = strings.TrimPrefix(option, "-encode-tag=")
+				} else if strings.HasPrefix(option, "-pool-size=") {
+					options.PoolSize = strings.ToUpper(strings.TrimPrefix(option, "-pool-size="))
 				}
 			}
 			break
@@ -411,11 +415,13 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 	findGenerateComment := func(genDecl *ast.GenDecl, typeSpec *ast.TypeSpec) (bool, GeneratorOptions) {
 		// Try node.Doc first (most common)
 		if found, options := parseGenerateComment(genDecl.Doc); found {
+			cg.options = options
 			return found, options
 		}
 
 		// Try typeSpec.Doc (sometimes comments are attached here)
 		if found, options := parseGenerateComment(typeSpec.Doc); found {
+			cg.options = options
 			return found, options
 		}
 
@@ -423,12 +429,13 @@ func (cg *CodeGenerator) parseStructs(filename string) error {
 		if len(targetFile.Decls) > 0 && targetFile.Decls[0] == genDecl {
 			for _, commentGroup := range targetFile.Comments {
 				if found, options := parseGenerateComment(commentGroup); found {
+					cg.options = options
 					return found, options
 				}
 			}
 		}
 
-		return false, DefaultOptions()
+		return false, cg.options
 	}
 
 	// First pass: collect all struct names that should be generated
@@ -1362,6 +1369,7 @@ func (cg *CodeGenerator) generateCode(outputFile string) (err error) {
 	if len(cg.structs) == 0 {
 		return fmt.Errorf("empty structs")
 	}
+	// fmt.Println("OPTIONS", cg.options)
 	data := struct {
 		Package  string
 		Structs  []StructInfo
@@ -1542,7 +1550,7 @@ func trimFile(inputFile, outputFile string) error {
 }
 
 // Generate is the main entry point for code generation
-func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, ignoreTag string, usePooling bool, maxStringLen int) error {
+func Generate(inputFile, outputFile, primaryTag, fallbackTag, encodeTag string, ignoreTag string, usePooling bool, maxStringLen int,) error {
 	if len(outputFile) == 0 {
 		outputFile = strings.TrimSuffix(inputFile, ".go") + "_gen.go"
 	}
