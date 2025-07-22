@@ -565,6 +565,9 @@ func (cg *CodeGenerator) extractStructInfo(structName string, structType *ast.St
 			}
 
 			fieldInfo := cg.extractFieldInfo(name.Name, field, actualType, resolvedTypeInfo, options)
+			if fieldInfo.ShouldIgnore {
+				continue
+			}
 			if resolvedTypeInfo == nil {
 				printError(fmt.Sprintf("Error resolving field: %s.%s. Please define a custom encoder", structName, name.Name))
 					panic("")
