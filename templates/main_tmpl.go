@@ -285,7 +285,7 @@ func (s {{.Name}}) EncodeFields() ([]EncodeField) {
 		}
 		i++
 	{{end}}
-	_ := i
+	_ = i
 	return f
 }
 
