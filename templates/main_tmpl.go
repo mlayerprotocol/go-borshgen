@@ -270,24 +270,24 @@ func (v *{{.Name}}View) ToStruct() (*{{.Name}}, error) {
 
 
 	// Encode creates a deterministic encoding of fields with "enc" tag
-func (s {{.Name}}) EncodeFields() ([]EncodeField) {
+func (s {{.Name}}) EncodeFields() (tags []string, encTypes []string, values []any) {
 	len := {{sortedEncFieldsLen .Fields}}
-	if len == 0 {
-		return []EncodeField{}
+	if len > 0 {
+		tags = make([]string, len)
+		encTypes = make([]string, len)
+		values = make([]any, len)
+		i := 0
+		
+		{{range sortedEncFields .Fields}}
+			tags[i] = "{{.BinaryTag}}"
+			encTypes[i] = "{{.BinaryTag}}"
+			values[i] = s.{{.Name}}
+			i++
+		{{end}}
+		_ = i
 	}
-	f := make([]EncodeField, len)
-	i := 0
 	
-	{{range sortedEncFields .Fields}}
-		f[i] = EncodeField{
-			Tag: "{{.BinaryTag}}",
-			EncodeType: "{{.EncType}}",
-			Value: s.{{.Name}},
-		}
-		i++
-	{{end}}
-	_ = i
-	return f
+	return tags, encTypes, values
 }
 
 	// Encode creates a deterministic encoding of fields with "enc" tag
