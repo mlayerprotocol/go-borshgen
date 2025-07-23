@@ -280,7 +280,7 @@ func (s {{.Name}}) EncodeFields() (tags []string, encTypes []string, values []an
 		
 		{{range sortedEncFields .Fields}}
 			tags[i] = "{{.BinaryTag}}"
-			encTypes[i] = "{{.BinaryTag}}"
+			encTypes[i] = "{{.EncType}}"
 			values[i] = s.{{.Name}}
 			i++
 		{{end}}
