@@ -282,7 +282,7 @@ func (s {{.Name}}) EncodeFields() ([]EncodeField) {
 		f[i] = EncodeField{
 			Tag: "{{.BinaryTag}}",
 			EncodeType: "{{.EncType}}",
-			Value: s{{.Name}},
+			Value: s.{{.Name}},
 		}
 		i++
 	{{end}}
