@@ -277,6 +277,7 @@ func (s {{.Name}}) EncodeFields() ([]EncodeField) {
 	}
 	f := make([]EncodeField, len)
 	i := 0
+	
 	{{range sortedEncFields .Fields}}
 		f[i] = EncodeField{
 			Tag: "{{.BinaryTag}}",
@@ -284,6 +285,7 @@ func (s {{.Name}}) EncodeFields() ([]EncodeField) {
 		}
 		i++
 	{{end}}
+	_ := i
 	return f
 }
 
