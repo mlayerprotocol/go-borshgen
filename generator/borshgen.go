@@ -153,6 +153,7 @@ type FieldInfo struct {
 	ShouldIgnore           bool
 	CanZeroCopy            bool // NEW: Whether this field supports zero-copy
 	HasEncTag              bool // NEW: Whether field has "enc" or "encode" tag for deterministic encoding
+	EncType              	string
 	EncOrder               int  // NEW: Sort order for deterministic encoding
 	SliceItem              int  // index of item if Type is Slice
 	ActualType             string
@@ -203,6 +204,16 @@ var templateFuncs = template.FuncMap{
 			return strings.Compare(x.BinaryTag, y.BinaryTag)
 		})
 		return encFields
+	},
+	"sortedEncFieldsLen": func(fields []FieldInfo) int {
+		i := 0
+		for _, field := range fields {
+			if field.HasEncTag {
+				i++
+			}
+		}
+		
+		return i
 	},
 	"getPrecedingFields": func(fields []FieldInfo, currentFieldName string) []FieldInfo {
 		var preceding []FieldInfo
@@ -305,9 +316,9 @@ func isBasicType(typeName string) bool {
 	return basicTypes[typeName]
 }
 
-func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOptions) (tagName string, ignore bool, encode bool, parser string) {
+func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOptions) (tagName string, ignore bool, parser string,  hasEncTag bool, encType string ) {
 	if field.Tag == nil {
-		return "", false, false, ""
+		return "", false, "", false, ""
 	}
 
 	tagString := strings.Trim(field.Tag.Value, "`")
@@ -315,10 +326,15 @@ func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOpti
 
 	structTag := reflect.StructTag(tag)
 	// Check for "enc" or "encode" tag first
-	_, hasEncTag := structTag.Lookup(options.EncodeTag)
+	encType, hasEncTag = structTag.Lookup(options.EncodeTag)
 	// if !hasEncTag  {
 	// 	_,	hasEncTag = structTag.Lookup("encode")
 	// }
+	commaIndex := strings.Index(encType, ",")
+	if commaIndex >= 0 {
+		encType = encType[0:commaIndex]
+	}
+	
 
 	if options.IgnoreTag == "" {
 		options.IgnoreTag = "-"
@@ -327,26 +343,26 @@ func (cg *CodeGenerator) extractFieldTag(field *ast.Field, options GeneratorOpti
 
 		if primaryTag == options.IgnoreTag {
 
-			return "", true, hasEncTag, ""
+			return "", true, "", hasEncTag, encType
 		}
 		parts := strings.Split(primaryTag, ",")
 
 		if len(parts) == 1 {
-			return parts[0], false, hasEncTag, ""
+			return parts[0], false, "", hasEncTag, encType
 		}
-		return parts[0], false, hasEncTag, parts[1]
+		return parts[0], false, parts[1], hasEncTag, encType
 	} else {
 
 		if fallbackTag := tag.Get(options.FallbackTag); fallbackTag != "" {
 			if fallbackTag == options.IgnoreTag {
-				return "", true, hasEncTag, ""
+				return "", true, "", hasEncTag, encType
 			}
 			parts := strings.Split(fallbackTag, ",")
 
-			return parts[0], false, hasEncTag, ""
+			return parts[0], false,  "", hasEncTag, encType
 		}
 	}
-	return "", false, hasEncTag, ""
+	return "", false, "", hasEncTag, encType
 }
 
 // parseStructs parses Go source files to extract struct information with full package resolution
@@ -1169,10 +1185,11 @@ func (cg *CodeGenerator) extractFieldInfo(name string, field *ast.Field, actualT
 	}
 
 	// Extract tag information with fallback
-	binaryTag, shouldIgnore, hasEncTag, customFieldEncoder := cg.extractFieldTag(field, options)
+	binaryTag, shouldIgnore, customFieldEncoder,  hasEncTag, encType := cg.extractFieldTag(field, options)
 	fieldInfo.BinaryTag = binaryTag
 	fieldInfo.ShouldIgnore = shouldIgnore
 	fieldInfo.HasEncTag = hasEncTag
+	fieldInfo.EncType = encType
 
 	if len(customFieldEncoder) > 0 {
 		if !strings.HasPrefix(customFieldEncoder, "[]") && !strings.HasPrefix(customFieldEncoder, "[][]") {

@@ -21,6 +21,10 @@ const (
 	MaxSliceLen  = {{.Options.MaxSliceLen}}
 )
 
+type EncodeField struct {
+	Tag string
+	EncodeType string
+}
 
 {{if .Options.UsePooling}}
 // Buffer pool for encoding

@@ -91,18 +91,18 @@ type EventPath struct {
 //go:generate borshgen -tag=msg -fallback=json
 type Event struct {
 	// Basic types
-	Any any `msg:"a,_DefaultByteArrayEncoder" enc:"f"`
+	Any any `msg:"a,_DefaultByteArrayEncoder" enc:"func"`
 	ArrayAny []any `msg:"aa," enc:"f"`
 	ID        ID `msg:"id" enc:""`
 	
 	PointerArray []*EventPath `msg:"par" enc:""`
-	EventType constants.EventType `msg:"type" enc:""`
-	FixedSliceCustom [][32]byte  `msg:"fsc,_FixedSliceEncoder" enc:""`
+	EventType constants.EventType `msg:"type" enc:"func"`
+	FixedSliceCustom [][32]byte  `msg:"fsc,_FixedSliceEncoder" enc:"func"`
 	FixedSlice [][32]byte  `msg:"fs" enc:""`
 	Chain  [][][]configs.ChainId `msg:"typep" enc:""`
 	//EventTypePtr *constants.EventType `msg:"typep" enc:""`
 	Parent    *[]ID   `msg:"parent" enc:"f"`
-	Timestamp uint64  `msg:"ts" enc:""`
+	Timestamp uint64  `msg:"ts" enc:"int"`
 	Data      []byte  `msg:"data"`
 	
 	// Additional basic types for comprehensive testing
