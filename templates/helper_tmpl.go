@@ -24,6 +24,7 @@ const (
 type EncodeField struct {
 	Tag string
 	EncodeType string
+	Value any
 }
 
 {{if .Options.UsePooling}}
