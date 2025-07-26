@@ -1463,7 +1463,7 @@ func GenerateDir(path, primaryTag, fallbackTag, encodeTag string, ignoreTag stri
 			fmt.Println()
 			tmp := strings.TrimSuffix(p, ".go") + "_" + hex.EncodeToString(hash) + "_tmp_gen.go"
 			defer os.Remove(tmp)
-			err := Generate(p, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
+			err := Generate(p, tmp, primaryTag, fallbackTag, encodeTag,  ignoreTag, usePooling, maxStringLen)
 			if err != nil {
 				fmt.Printf("CodeGentWarning: %v", err)
 				if !strings.Contains(err.Error(), "no structs found") {
@@ -1498,7 +1498,7 @@ func GenerateFile(path, primaryTag, fallbackTag, encodeTag string, ignoreTag str
 	fmt.Println()
 	tmp := strings.TrimSuffix(path, ".go") + "_" + hex.EncodeToString(hash) + "_tmp_gen.go"
 	defer os.Remove(tmp)
-	err = Generate(path, tmp, primaryTag, fallbackTag, ignoreTag, encodeTag, usePooling, maxStringLen)
+	err = Generate(path, tmp, primaryTag, fallbackTag, encodeTag, ignoreTag,  usePooling, maxStringLen)
 	if err != nil {
 
 		if !strings.Contains(err.Error(), "no structs found") {
